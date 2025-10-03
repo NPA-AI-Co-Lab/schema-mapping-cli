@@ -1,0 +1,5 @@
+[
+  { "notation": "CONSENT_IMPLICIT", "value": "implicit" },
+  { "notation": "CONSENT_EXPLICIT", "value": "explicit" },
+  { "notation": "CONSENT_IMPORTED", "value": "imported" }
+]

@@ -1,0 +1,8 @@
+[
+    {"notation": "EDU_NO_FORMAL", "value": "no_formal_education"},
+    {"notation": "EDU_PRIMARY", "value": "primary_education"},
+    {"notation": "EDU_SECONDARY", "value": "secondary_education"},
+    {"notation": "EDU_BACHELORS", "value": "bachelors_degree"},
+    {"notation": "EDU_MASTERS", "value": "masters_degree"},
+    {"notation": "EDU_DOCTORATE", "value": "doctorate_degree"}
+]

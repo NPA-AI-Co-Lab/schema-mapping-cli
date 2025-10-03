@@ -1,0 +1,6 @@
+[
+    { "notation": "GENDER_MALE", "value": "male" },
+    { "notation": "GENDER_FEMALE", "value": "female" },
+    { "notation": "GENDER_NON_BINARY", "value": "non-binary" },
+    { "notation": "GENDER_OTHER_UNSPECIFIED", "value": "other/unspecified" }
+]

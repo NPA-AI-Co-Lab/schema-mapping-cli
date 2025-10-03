@@ -1,0 +1,13 @@
+{
+  "title": "InteractionAnalysisSchema",
+  "type": "object",
+  "strict": true,
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/result" }    
+    }
+  },
+  "required": ["results"],
+  "additionalProperties": false
+}

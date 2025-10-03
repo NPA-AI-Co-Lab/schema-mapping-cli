@@ -1,0 +1,6 @@
+[
+  { "notation": "AGE_GROUP_UNDERAGE", "value": "underage" },
+  { "notation": "AGE_GROUP_YOUTH", "value": "youth" },
+  { "notation": "AGE_GROUP_ADULT", "value": "adult" },
+  { "notation": "AGE_GROUP_SENIOR", "value": "senior" }
+]

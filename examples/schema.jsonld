@@ -1,0 +1,278 @@
+{
+    "@context": {
+        "@vocab": "https://schema.org/",
+        "activitystream": "https://www.w3.org/ns/activitystreams#",
+        "userID": "identifier",
+        "personID": "identifier",
+        "objectID": "identifier",
+        "primaryEmail": "email",
+        "additionalEmails": "email",
+        "engagementScore": "ratingValue",
+        "donorStatus": "category",
+        "lastDonationDate": "dateCreated",
+        "tags": "keywords",
+        "dataSource": "isBasedOn",
+        "consentDate": "dateCreated",
+        "consentType": "category",
+        "title": "name",
+        "type": "category",
+        "subType": "additionalType",
+        "published": "datePublished",
+        "subject": "keywords",
+        "responses": "about",
+        "object": "identifier",
+        "person": "identifier",
+        "referrer": "activitystream:origin",
+        "userAgent": "instrument",
+        "timeSpent": "duration",
+        "completionRate": "value"
+    },
+    "entities": {
+        "person": {
+            "@type": "Person",
+            "idProp": "userID",
+            "properties": {
+                "userID": {
+                    "type": "string",
+                    "description": "Global user ID",
+                    "required": true
+                },
+                "givenName": {
+                    "type": "string",
+                    "description": "First name of the user"
+                },
+                "familyName": {
+                    "type": "string",
+                    "description": "Last name of the user"
+                },
+                "primaryEmail": {
+                    "type": "string",
+                    "description": "The primary contact address for the user. If the user has authenticated, this should be supplied. Otherwise it will be blank or undefined."
+                },
+                "additionalEmails": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "An array of additional addresses, for the purposes of matching."
+                },
+                "engagementScore": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "A numeric score from 1-5 representing the user’s engagement with the newsroom’s content."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "An array of tags that could also represent MailChimp lists."
+                },
+                "dataSource": {
+                    "type": "string",
+                    "description": "Where this record originated",
+                    "required": true
+                },
+                "consentDate": {
+                    "type": "string",
+                    "description": "Date-time when user gave consent. RFC 3339 format, e.g., 2023-06-25T14:33:42Z"
+                },
+                "consentType": {
+                    "type": "string",
+                    "enumFromTaxonomy": "ConsentType-v1",
+                    "description": "The type of consent the user has given"
+                },
+                "demographics": {
+                    "type": "object",
+                    "properties": {
+                        "ageGroup": {
+                            "type": "string",
+                            "enumFromTaxonomy": "AgeGroup-v1",
+                            "description": "Age group of the user"
+                        },
+                        "gender": {
+                            "type": "string",
+                            "enumFromTaxonomy": "Gender-v1",
+                            "description": "Gender of the user"
+                        },
+                        "educationLevel": {
+                            "type": "string",
+                            "enumFromTaxonomy": "EducationLevel-v1",
+                            "description": "Education level of the user"
+                        },
+                        "incomeBracket": {
+                            "type": "string",
+                            "enumFromTaxonomy": "IncomeBracket-v1",
+                            "description": "Income bracket of the user"
+                        }
+                    }
+                },
+                "location": {
+                    "type": "object",
+                    "properties": {
+                        "postalCode": {
+                            "type": "string",
+                            "description": "A deliberately freeform field that can take postal code in a variety of local forms. (US zip codes are numeric, but national systems vary.) "
+                        },
+                        "addressCountry": {
+                            "type": "string",
+                            "description": "Two-letter ISO 3166-1 country code"
+                        },
+                        "addressLocality": {
+                            "type": "string",
+                            "description": "City or locality"
+                        }
+                    }
+                },
+                "behavior": {
+                    "type": "object",
+                    "properties": {
+                        "donorStatus": {
+                            "type": "string",
+                            "enumFromTaxonomy": "DonorStatus-v1",
+                            "description": "An indicator whether the user is a donor. Consider minor donor to be below $100, above that - major donor."
+                        },
+                        "lastDonationDate": {
+                            "type": "string",
+                            "description": "formatted date-time representing when the user last donated. RFC 3339 format, e.g., 2023-06-25T14:33:42Z"
+                        }
+                    }
+                },
+                "interests": {
+                    "type": "object",
+                    "properties": {
+                        "topics": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "An array of topics that the user is interested in."
+                        },
+                        "commentedOn": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "An array of topics that the user has commented on."
+                        }
+                    }
+                }
+            }
+        },
+        "object": {
+            "@type": "Object",
+            "idProp": "objectID",
+            "properties": {
+                "objectID": {
+                    "type": "string",
+                    "description": "This could potentially be a hashed uuid, but most commonly will be a URI, for example the URL for an article or survey.",
+                    "pattern": "^(https?:\\/\\/)?([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}(:\\d+)?(\\/[^\\s]*)?$",
+                    "required": true
+                },
+                "title": {
+                    "type": "string",
+                    "description": "The plaintext name of the object."
+                },
+                "type": {
+                    "type": "string",
+                    "enumFromTaxonomy": "ObjectType-v1"
+                },
+                "subType": {
+                    "type": "string",
+                    "description": "Text field to allow for further granularity in types, for analysis rather than parsing purposes."
+                },
+                "published": {
+                    "type": "string",
+                    "description": "Date-time when the item was created. RFC 3339 format, e.g., 2023-06-25T14:33:42Z",
+                    "required": true
+                },
+                "subject": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "An array of tags or subjects that describe the object."
+                },
+                "responses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question": {
+                                "type": "string",
+                                "description": "The survey question text"
+                            },
+                            "answer": {
+                                "type": "string",
+                                "description": "The user's response to the question. Is string, but answers may be in any format (e.g. 'Yes', 'TRUE' '5', '<free text>', etc.). It may even be empty if the user skipped the question."
+                            }
+                        },
+                        "required": ["question", "answer"]
+                    },
+                    "description": "Survey responses as an array of question/answer pair objects. Required for surveyResponse objects."
+                },
+                "dataSource": {
+                    "type": "string",
+                    "description": "Where this record originated",
+                    "required": true
+                }
+            }
+        },
+        "action": {
+            "@type": "Action",
+            "properties": {
+                "actionType": {
+                    "type": "string",
+                    "enumFromTaxonomy": "ActionType-v1",
+                    "description": "represents the action type and the platform being used."
+                },
+                "person": {
+                    "type": "string",
+                    "description": "The globally unique id of the person performing the action. Most likely the userID from the person entity.",
+                    "required": true
+                },
+                "object": {
+                    "type": "string",
+                    "description": "The globally unique id of the object the action is being performed on.",
+                    "pattern": "^(https?:\\/\\/)?([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}(:\\d+)?(\\/[^\\s]*)?$",
+                    "required": true
+                },
+                "referrer": {
+                    "type": "string",
+                    "description": "The URI of the page that sent the user to conduct the action. If not known, this field should be blank or undefined."
+                },
+                "published": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Date-time when the action occurred. RFC 3339 format, e.g., 2023-06-25T14:33:42Z",
+                    "required": true
+                },
+                "timeSpent": {
+                    "type": "string",
+                    "description": "An ISO 8601 duration representing the amount of time the user spent on the object."
+                },
+                "completionRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "The portion of a resource completed (e.g., an article read or a survey answered)."
+                },
+                "dataSource": {
+                    "type": "string",
+                    "description": "Where this record originated",
+                    "required": true
+                },
+                "deviceContext": {
+                    "type": "object",
+                    "properties": {
+                        "userAgent": {
+                            "type": "string",
+                            "description": "A string describing the software used by the user (eg a browser user agent or mobile app signature)."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,372 @@
+# NPA Ingest Insight CLI
+
+A command-line tool for analyzing and structuring data using Language Model APIs. This CLI processes CSV data files and outputs structured analysis results in JSON-LD format according to a customizable schema.
+
+The tool features a modular architecture with pluggable LLM providers, making it easy to swap between different AI services while maintaining the same analysis pipeline.
+
+## Configuration
+
+### Environment Variables
+
+The application uses a `.env` file for sensitive credentials only:
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+```
+
+All other configuration is handled through the `config.json` file for better maintainability and deployment flexibility.
+
+### LLM Configuration
+
+You can customize the LLM settings in your `config.json`:
+
+- **defaultModel**: Primary model to use (e.g., "gpt-5", "gpt-5-mini", "gpt-4.1")
+- **fallbackModel**: Backup model when primary fails
+- **batchSize**: Number of records per API request (1-50)
+- **concurrencySize**: Concurrent API requests (1-20)
+
+The tool supports multiple LLM providers through a pluggable client architecture. Currently supports OpenAI, with easy extensibility for other providers.
+
+## Prerequisites
+
+- Node.js (v18 or higher)
+- LLM API key (currently supports OpenAI)
+
+## Installation
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/<REPO_NAME>/npa-ingest-insight-cli.git
+cd npa-ingest-insight-cli
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Set up your LLM API key (choose one method), guide for OpenAI:
+
+**Option A: Environment Variable**
+```bash
+export OPENAI_API_KEY="your-api-key-here"
+```
+
+**Option B: .env file**
+```bash
+# Edit the .env file and add your API key
+OPENAI_API_KEY=your-api-key-here
+```
+
+4. Build the project:
+
+```bash
+npm run build
+```
+
+5. Install globally (optional):
+
+```bash
+npm install -g .
+```
+
+## Usage
+
+### Configuration File
+
+Create a configuration file (`config.json`) with your data and schema paths:
+
+```json
+{
+  "dataPath": "./examples/sample_comments.csv",
+  "schemaPath": "./examples/schema.jsonld",
+  "outputPath": "./output/analysis_results.jsonld",
+  "enableLogging": true,
+  "hidePII": true,
+  "retriesNumber": 2,
+  "requiredFieldErrorsFailBatch": false,
+  "batchSize": 5,
+  "concurrencySize": 5,
+  "defaultModel": "gpt-4o-mini",
+  "fallbackModel": "gpt-4o"
+}
+```
+
+- **dataPath** specifies the path to the input CSV file;
+- **schemaPath** specifies the path to schema that the output will be based on;
+- **outputPath** specifies the path where results will be saved. Required when using `--config` argument, optional for interactive mode;
+- **enableLogging** enables/disables logging of AI prompts and error messages into separate files;
+- **hidePII** enables/disables PII handling logic.
+- **retriesNumber** specifies how many retries the program will make on an erroneous API response before stopping the analysis.
+- **requiredFieldErrorsFailBatch** is an optional flag specifying how the tool should handle missing required fields - similarly to other validation errors if true, or by simply logging them if false.
+- **batchSize** - Number of data rows sent per request to the LLM API;
+- **concurrencySize** - Maximum number of asynchronous prompts that can run at once;
+- **defaultModel** - The model that will analyze the data by default (it is possible to change LLM versions as you like);
+- **fallbackModel** - The model that will handle analysis when the default model fails;
+
+### Schema file
+
+A proper schema file should be a JSONLD with the following structure:
+
+```json
+{
+    "@context": {
+        "@vocab": "https://schema.org/",
+        "activitystream": "https://www.w3.org/ns/activitystreams#",
+        "userID": "identifier",
+        "personID": "identifier",
+        "objectID": "identifier",
+        "primaryEmail": "email",
+        "additionalEmails": "email",
+        "engagementScore": "ratingValue",
+        "donorStatus": "category",
+        "lastDonationDate": "dateCreated",
+        "tags": "keywords",
+        "dataSource": "isBasedOn"
+    },
+    "entities": {
+        "person": {
+            "@type": "Person",
+            "idProp": "userID",
+            "properties": {
+                "userID": {
+                    "type": "string",
+                    "description": "Global user ID",
+                    "format": "uuid",
+                    "required": true
+                },
+                "givenName": {
+                    "type": "string",
+                    "description": "First name of the user"
+                },
+                "familyName": {
+                    "type": "string",
+                    "description": "Last name of the user"
+                },
+                "primaryEmail": {
+                    "type": "string",
+                    "description": "The primary contact address for the user. If the user has authenticated, this should be supplied. Otherwise it will be blank or undefined."
+                },
+                "additionalEmails": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "An array of additional addresses, for the purposes of matching."
+                },
+                "engagementScore": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "A numeric score from 1-5 representing the user’s engagement with the newsroom’s content."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "An array of tags that could also represent MailChimp lists."
+                },
+                "dataSource": {
+                    "type": "string",
+                    "description": "Where this record originated",
+                    "required": true
+                },
+                "consentDate": {
+                    "type": "string",
+                    "description": "Date-time when user gave consent"
+                },
+                "consentType": {
+                    "type": "string",
+                    "enumFromTaxonomy": "ConsentType-v1",
+                    "description": "The type of consent the user has given"
+                },
+                "demographics": {
+                    "type": "object",
+                    "properties": {
+                        "ageGroup": {
+                            "type": "string",
+                            "enumFromTaxonomy": "AgeGroup-v1",
+                            "description": "Age group of the user"
+                        },
+                        "gender": {
+                            "type": "string",
+                            "enumFromTaxonomy": "Gender-v1",
+                            "description": "Gender of the user"
+                        },
+                        "educationLevel": {
+                            "type": "string",
+                            "enumFromTaxonomy": "EducationLevel-v1",
+                            "description": "Education level of the user"
+                        },
+                        "incomeBracket": {
+                            "type": "string",
+                            "enumFromTaxonomy": "IncomeBracket-v1",
+                            "description": "Income bracket of the user"
+                        }
+                    }
+                },
+                "location": {
+                    "type": "object",
+                    "properties": {
+                        "postalCode": {
+                            "type": "string",
+                            "description": "A deliberately freeform field that can take postal code in a variety of local forms. (US zip codes are numeric, but national systems vary.) "
+                        },
+                        "addressCountry": {
+                            "type": "string",
+                            "description": "Two-letter ISO 3166-1 country code"
+                        },
+                        "addressLocality": {
+                            "type": "string",
+                            "description": "City or locality"
+                        }
+                    }
+                },
+                "behavior": {
+                    "type": "object",
+                    "properties": {
+                        "donorStatus": {
+                            "type": "string",
+                            "enumFromTaxonomy": "DonorStatus-v1",
+                            "description": "An indicator whether the user is a donor"
+                        },
+                        "lastDonationDate": {
+                            "type": "string",
+                            "description": "formatted date-time representing when the user last donated."
+                        }
+                    }
+                },
+                "interests": {
+                    "type": "object",
+                    "properties": {
+                        "topics": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "An array of topics that the user is interested in."
+                        },
+                        "commentedOn": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "An array of topics that the user has commented on."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Here **idProp** specifies which of the properties will constitute the **@id** of resulting JSONLD entity; required properties are specified via **"required": true**.
+
+You can also find examples of [config](./config.json) and [schema](./examples/schema.jsonld) files in the repository.
+
+### Restrictions
+
+There are several ways to enforce rules onto the fields of your schema. Most important among them:
+- **required** defines if the field can be left empty;
+- **format** enables enforcement of one of several basic string formats ($email$, $date$, $time$, $datetime$, $duration$, $uuid$);
+- **pattern** allows enforcement of other formats via a regex expression;
+- **enumFromTaxonomy** restricts possible field values to those of the correspoding taxonomy located in [the taxonomies folder](./taxonomies).
+
+### Environment Configuration
+
+The application uses a `.env` file for configuration. Key settings include:
+
+- **OPENAI_API_KEY** - Your LLM API key (currently OpenAI, alternative to environment variable)
+
+Example `.env` file:
+```bash
+OPENAI_API_KEY=your_api_key_here
+```
+
+### Running the CLI
+
+#### Interactive Mode (for manual use):
+
+```bash
+# If installed globally:
+npa-insight analyze
+
+# Using npm:
+npm run start analyze
+
+# Alternative if npm run start doesn't work:
+node dist/cli.js analyze
+```
+
+The CLI will prompt you for:
+- **Configuration file path**: Path to your config.json
+- **Output file path**: Where to save results (.jsonld) (only if not specified in config)
+
+#### Automated Mode (for scripts and automation):
+
+```bash
+# Using config file argument (no prompts):
+npa-insight analyze --config ./path/to/config.json
+
+# Using npm:
+npm run start analyze -- --config ./path/to/config.json
+
+# Alternative if npm run start doesn't work:
+node dist/cli.js analyze --config ./path/to/config.json
+```
+
+When using the `--config` argument:
+- No interactive prompts will be shown
+- All configuration must be specified in the config file, including `outputPath`
+- Perfect for automation, CI/CD pipelines, and integration with other systems
+
+## Linting
+
+The project uses ESLint. For details on how to run the linting, please
+refer to [typescript-eslint](https://typescript-eslint.io/getting-started).
+
+## Project Structure
+
+## Project Structure
+
+```
+├── src/
+│   ├── analysis/           # Analysis and processing logic
+│   ├── cli/                # Modular CLI components
+│   ├── clients/            # LLM client implementations
+│   │   └── openai-client.ts # OpenAI client implementation
+│   ├── interfaces/         # Type definitions and contracts
+│   │   └── llm-client.ts   # LLM client interface
+│   ├── types/           # Type definitions
+│   ├── jsonld/          # input/output files processing
+│   ├── utils/              # Utility functions
+│   ├── cli.ts              # Main CLI entry point
+│   ├── ...
+├── examples/                   # Sample data files for testing
+├── static/
+│   ├── pii_field_map.json  # PII field mapping configuration
+│   ├── skeleton.json       # Base schema for LLM processing
+│   └── instructions.txt    # LLM model instructions
+├── examples/               # Sample files
+├── taxonomies/             # Structures of taxonomies present in the schema
+├── .env                    # Contains global constants
+├── config.json             # Example config
+├── CHANGELOG.md
+└── README.md
+
+```
+### Versioning
+
+This project follows [Semantic Versioning 2.0.0](https://semver.org/).
+
+### Support
+
+For issues and questions, please check the [CHANGELOG.md](CHANGELOG.md) for recent updates or open an issue in the repository.
+
+---
+
+**Note**: This tool processes data using LLM APIs (currently OpenAI). Be mindful of data privacy and API usage costs when processing large datasets.

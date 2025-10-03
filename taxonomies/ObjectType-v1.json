@@ -1,0 +1,6 @@
+[
+    { "notation": "TYPE_ARTICLE", "value": "article" },
+    { "notation": "TYPE_NEWSLETTER", "value": "newsletter" },
+    { "notation": "TYPE_SURVEY", "value": "survey" },
+    { "notation": "TYPE_SURVEY_RESPONSE", "value": "survey_response" }
+]

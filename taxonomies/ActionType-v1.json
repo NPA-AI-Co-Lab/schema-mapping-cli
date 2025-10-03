@@ -1,0 +1,14 @@
+[
+    {"notation": "ACTION_NEWSLETTER_SUBSCRIBE", "value": "newsletter_subscribe"},
+    {"notation": "ACTION_NEWSLETTER_UNSUBSCRIBE", "value": "newsletter_unsubscribe"},
+    {"notation": "ACTION_NEWSLETTER_CLICK", "value": "newsletter_click"},
+    {"notation": "ACTION_NEWSLETTER_OPEN", "value": "newsletter_open"},
+    {"notation": "ACTION_WEB_READ", "value": "web_read"},
+    {"notation": "ACTION_APP_READ", "value": "app_read"},
+    {"notation": "ACTION_FORM_SUBMIT", "value": "form_submit"},
+    {"notation": "ACTION_SURVEY_COMPLETE", "value": "survey_complete"},
+    {"notation": "ACTION_COMMENT_POST", "value": "comment_post"},
+    {"notation": "ACTION_DONATION_MADE", "value": "donation_made"},
+    {"notation": "ACTION_IRL_EVENT_ATTEND", "value": "irl_event_attend"}
+]
+

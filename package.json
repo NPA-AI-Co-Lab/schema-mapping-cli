@@ -1,0 +1,57 @@
+{
+  "name": "npa-ingest-insight-cli",
+  "version": "0.5.2",
+  "main": "cli.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "lint": "eslint \"src/**/*.ts\" --config src/eslint.config.mjs"
+  },
+  "bin": {
+    "npa-insight": "./dist/cli.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "CLI application to structure and tag data",
+  "dependencies": {
+    "@coffeeandfun/remove-pii": "^2.0.0",
+    "commander": "^14.0.0",
+    "csv-parser": "^3.2.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^17.2.1",
+    "json-refs": "^3.0.15",
+    "json-schema": "^0.4.0",
+    "openai": "^5.11.0",
+    "ora": "^8.2.0",
+    "p-limit": "^6.2.0",
+    "p-retry": "^6.2.1",
+    "prompts": "^2.4.2",
+    "uuid": "^13.0.0",
+    "zod": "^3.25.76",
+    "zod-from-json-schema": "0.0.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@types/esbuild-copy-static-files": "^0.1.4",
+    "@types/json-schema": "^7.0.15",
+    "@types/prompts": "^2.4.9",
+    "@types/uuid": "^10.0.0",
+    "@vercel/ncc": "^0.38.3",
+    "esbuild": "^0.25.9",
+    "esbuild-copy-static-files": "^0.1.0",
+    "eslint": "^9.32.0",
+    "globals": "^16.3.0",
+    "jiti": "^2.5.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0",
+    "zod-to-json-schema": "^3.24.6"
+  },
+  "overrides": {
+    "minimist": "^1.2.7",
+    "superagent": "^10.2.2"
+  }
+}

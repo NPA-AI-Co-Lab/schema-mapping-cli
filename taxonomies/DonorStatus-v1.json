@@ -1,0 +1,6 @@
+[
+  { "notation": "DONOR_NO", "value": "no" },
+  { "notation": "DONOR_MINOR", "value": "minor" },
+  { "notation": "DONOR_MAJOR", "value": "major" },
+  { "notation": "DONOR_LAPSED", "value": "lapsed" }
+]

@@ -1,0 +1,9 @@
+[
+    { "notation": "INCOME_VERY_LOW", "value": "very_low" },
+    { "notation": "INCOME_LOW", "value": "low" },
+    { "notation": "INCOME_LOWER_MIDDLE", "value": "lower_middle" },
+    { "notation": "INCOME_MIDDLE", "value": "middle" },
+    { "notation": "INCOME_UPPER_MIDDLE", "value": "upper_middle" },
+    { "notation": "INCOME_HIGH", "value": "high" },
+    { "notation": "INCOME_VERY_HIGH", "value": "very_high" }
+]

@@ -1,0 +1,28 @@
+{
+  "name": { "placeholder": "NAME_{ind}" },
+  "names": { "placeholder": "NAME_{ind}", "multi": true },
+  "surname": { "placeholder": "NAME_{ind}" },
+  "firstname": { "placeholder": "NAME_{ind}" },
+  "lastname": { "placeholder": "NAME_{ind}" },
+  "givenname": { "placeholder": "NAME_{ind}" },
+  "familyname": { "placeholder": "NAME_{ind}" },
+  "nickname": { "placeholder": "NAME_{ind}" },
+
+  "email": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
+  "primaryemail": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
+  "emails": { "placeholder": "EMAIL_{ind}@GMAIL.COM", "multi": true },
+  "additionalemails": { "placeholder": "EMAIL_{ind}@GMAIL.COM", "multi": true },
+
+  "address": { "placeholder": "ADDRESS_{ind}" },
+  "postalcode": { "placeholder": "ADDRESS_{ind}" },
+  "ip": { "placeholder": "ADDRESS_{ind}" },
+  "ipaddress": { "placeholder": "ADDRESS_{ind}" },
+
+  "id": { "placeholder": "ID_{ind}" },
+  "userid": { "placeholder": "ID_{ind}" },
+  "user_id": { "placeholder": "ID_{ind}" },
+
+  "phone": { "placeholder": "PHONE_{ind}" },
+  "phonenumber": { "placeholder": "PHONE_{ind}" },
+  "phonenumbers": { "placeholder": "PHONE_{ind}", "multi": true }
+}
