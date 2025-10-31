@@ -14,13 +14,13 @@ export interface LLMPromptInput {
 export interface LLMAnalysisRequest {
   /** Instructions/prompt text for the LLM */
   instructions: string;
-  
+
   /** Input messages for the conversation */
   input: LLMPromptInput[];
-  
+
   /** Model name to use */
   model: string;
-  
+
   /** Zod schema for response validation */
   zodSchema: ZodTypeAny;
 }
@@ -31,10 +31,10 @@ export interface LLMAnalysisRequest {
 export interface LLMAnalysisResponse {
   /** Parsed and validated output */
   result: Record<string, unknown>;
-  
+
   /** Raw response text */
   rawText: string;
-  
+
   /** Model used for the request */
   model: string;
 }
@@ -56,17 +56,17 @@ export interface ILLMClient {
    * Perform analysis using the configured LLM
    */
   analyze(request: LLMAnalysisRequest): Promise<LLMAnalysisResponse>;
-  
+
   /**
    * Get the default model name
    */
   getDefaultModel(): string;
-  
+
   /**
    * Get the fallback model name
    */
   getFallbackModel(): string;
-  
+
   /**
    * Check if the client is properly configured
    */

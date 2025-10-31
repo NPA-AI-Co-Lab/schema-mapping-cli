@@ -1,7 +1,7 @@
 export {};
 
 declare global {
-  type PromptInput = { role: "user" | "system"; content: string };
+  type PromptInput = { role: 'user' | 'system'; content: string };
   type AnalysisResult = {
     [key: string]: unknown;
     results?: unknown[];
@@ -9,13 +9,13 @@ declare global {
   type RecordData = Record<string, string>;
   type JsonSchema = Record<string, unknown>;
   interface OutputRecord {
-  person: Person;
-  object?: unknown;
-  action?: unknown;
-  [key: string]: unknown;
-  };
+    person: Person;
+    object?: unknown;
+    action?: unknown;
+    [key: string]: unknown;
+  }
   type JsonLdSchema = {
-    "@context": Record<string, string>;
+    '@context': Record<string, string>;
     entities: Record<string, JsonLdEntity>;
   };
 
@@ -26,7 +26,6 @@ declare global {
   interface EncodingMap {
     [placeholder: string]: string;
   }
-
 
   /**
    * Complete arguments needed for processing a batch of CSV data.
@@ -49,34 +48,29 @@ declare global {
     /** Model name to use */
     model: string;
     /** Optional validation error logging function */
-    logValidationError?: (
-      error: import("../logging.js").ValidationErrorDetails
-    ) => Promise<void>;
+    logValidationError?: (error: import('../logging.js').ValidationErrorDetails) => Promise<void>;
     /** Optional Zod error parsing function */
     parseZodError?: (
-      zodError: import("zod").ZodError,
+      zodError: import('zod').ZodError,
       batchIndex: number,
       csvLineStart: number,
       csvLineEnd: number,
       originalData?: undefined,
       originalBatch?: Record<string, string>[]
-    ) => import("../logging.js").ValidationErrorDetails[];
+    ) => import('../logging.js').ValidationErrorDetails[];
     /** Starting CSV line number for this batch */
     csvLineStart: number;
     /** Function to decode PII placeholders */
-    decodePII: (
-      encodedRecords: AnalysisResult,
-      encodingMap: EncodingMap
-    ) => AnalysisResult;
+    decodePII: (encodedRecords: AnalysisResult, encodingMap: EncodingMap) => AnalysisResult;
     /** PII encoding mapping */
     encodingMap: EncodingMap;
     /** Whether required field validation errors should fail the batch */
     requiredFieldErrorsFailBatch: boolean;
   }
 
-  type FetchAnalysisArgs = import("./analysis.js").FetchAnalysisArgs;
-  type DecodeResultsArgs = import("./analysis.js").DecodeResultsArgs;
-  type ValidateResultsArgs = import("./validation.js").ValidateResultsArgs;
-  type ValidateLengthArgs = import("./validation.js").ValidateLengthArgs;
-  type ValidateZodSchemaArgs = import("./validation.js").ValidateZodSchemaArgs;
+  type FetchAnalysisArgs = import('./analysis.js').FetchAnalysisArgs;
+  type DecodeResultsArgs = import('./analysis.js').DecodeResultsArgs;
+  type ValidateResultsArgs = import('./validation.js').ValidateResultsArgs;
+  type ValidateLengthArgs = import('./validation.js').ValidateLengthArgs;
+  type ValidateZodSchemaArgs = import('./validation.js').ValidateZodSchemaArgs;
 }

@@ -9,16 +9,16 @@ import { ZodTypeAny } from 'zod';
 export interface FetchAnalysisArgs {
   /** The LLM client instance for making API requests */
   client: ILLMClient;
-  
+
   /** Instructions/prompt text that will be sent to the LLM */
   instructions: string;
-  
+
   /** Zod schema used for validating the LLM response structure */
   zodSchema: ZodTypeAny;
-  
+
   /** Array of prompt messages (user/system roles with content) */
   input: PromptInput[];
-  
+
   /** The model name to use for the API request (e.g., 'gpt-4') */
   model: string;
 }
@@ -31,10 +31,10 @@ export interface FetchAnalysisArgs {
 export interface DecodeResultsArgs {
   /** Raw output from the LLM that may contain encoded PII placeholders */
   rawOutput: AnalysisResult;
-  
+
   /** Function that decodes PII placeholders back to original values */
   decodePII: (encodedRecords: AnalysisResult, encodingMap: EncodingMap) => AnalysisResult;
-  
+
   /** Mapping of placeholders to original PII values */
   encodingMap: EncodingMap;
 }

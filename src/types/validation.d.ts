@@ -8,32 +8,32 @@ import { ZodTypeAny, ZodError } from 'zod';
 export interface ValidateResultsArgs {
   /** The processed output data to validate */
   output: AnalysisResult;
-  
+
   /** Zod schema to validate the output structure against */
   zodSchema: ZodTypeAny;
-  
+
   /** Optional function to log validation errors for debugging */
   logValidationError?: (error: ValidationErrorDetails) => Promise<void>;
-  
+
   /** Optional function to parse and format Zod validation errors */
   parseZodError?: (
-    zodError: ZodError, 
-    batchIndex: number, 
-    csvLineStart: number, 
-    csvLineEnd: number, 
-    originalData?: undefined, 
+    zodError: ZodError,
+    batchIndex: number,
+    csvLineStart: number,
+    csvLineEnd: number,
+    originalData?: undefined,
     originalBatch?: Record<string, string>[]
   ) => ValidationErrorDetails[];
-  
+
   /** Index of the current batch being processed */
   index: number;
-  
+
   /** Starting line number in the CSV file for this batch */
   csvLineStart: number;
-  
+
   /** Number of records in the current batch */
   batchLength: number;
-  
+
   /** Whether required field validation errors should fail the batch */
   requiredFieldErrorsFailBatch?: boolean;
 }
@@ -45,16 +45,16 @@ export interface ValidateResultsArgs {
 export interface ValidateLengthArgs {
   /** The output data to check for correct length */
   output: AnalysisResult;
-  
+
   /** Expected number of results based on input batch size */
   batchLength: number;
-  
+
   /** Index of the current batch being processed */
   index: number;
-  
+
   /** Starting line number in the CSV file for this batch */
   csvLineStart: number;
-  
+
   /** Optional function to log validation errors */
   logValidationError?: (error: ValidationErrorDetails) => Promise<void>;
 }
@@ -66,32 +66,32 @@ export interface ValidateLengthArgs {
 export interface ValidateZodSchemaArgs {
   /** The output data to validate against the schema */
   output: AnalysisResult;
-  
+
   /** Zod schema defining the expected structure and constraints */
   zodSchema: ZodTypeAny;
-  
+
   /** Optional function to log detailed validation errors */
   logValidationError?: (error: ValidationErrorDetails) => Promise<void>;
-  
+
   /** Optional function to parse Zod errors into readable format */
   parseZodError?: (
-    zodError: ZodError, 
-    batchIndex: number, 
-    csvLineStart: number, 
-    csvLineEnd: number, 
-    originalData?: undefined, 
+    zodError: ZodError,
+    batchIndex: number,
+    csvLineStart: number,
+    csvLineEnd: number,
+    originalData?: undefined,
     originalBatch?: Record<string, string>[]
   ) => ValidationErrorDetails[];
-  
+
   /** Index of the current batch being processed */
   index: number;
-  
+
   /** Starting line number in the CSV file for this batch */
   csvLineStart: number;
-  
+
   /** Number of records in the current batch */
   batchLength: number;
-  
+
   /** Optional original batch data for error context */
   originalBatch?: Record<string, string>[];
 }
