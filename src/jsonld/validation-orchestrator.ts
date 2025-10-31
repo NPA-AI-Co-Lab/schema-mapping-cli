@@ -1,6 +1,6 @@
-import { ValidationError } from "../utils/errors.js";
-import { ValidationErrorDetails } from "./types.js";
-import { validateObjectRecursively } from "./validation-traversal.js";
+import { ValidationError } from '../utils/errors.js';
+import { ValidationErrorDetails } from './types.js';
+import { validateObjectRecursively } from './validation-traversal.js';
 
 /**
  * Validate required fields in batch results
@@ -58,13 +58,7 @@ async function validateSingleResult(
   csvRowIndex: number,
   logValidationError: (error: ValidationErrorDetails) => Promise<void>
 ): Promise<number> {
-  return await validateObjectRecursively(
-    result,
-    batchIndex,
-    csvRowIndex,
-    "",
-    logValidationError
-  );
+  return await validateObjectRecursively(result, batchIndex, csvRowIndex, '', logValidationError);
 }
 
 /**

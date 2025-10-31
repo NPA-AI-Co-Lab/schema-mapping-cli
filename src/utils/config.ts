@@ -1,7 +1,7 @@
-import dotenv from "dotenv";
-import { EnvConfig, AppConfig } from "./types.js";
-import { loadJSON } from "./file-system.js";
-import path from "path";
+import dotenv from 'dotenv';
+import { EnvConfig, AppConfig } from './types.js';
+import { loadJSON } from './file-system.js';
+import path from 'path';
 
 dotenv.config({ quiet: true });
 
@@ -54,14 +54,14 @@ export function getConcurrencySize(config?: AppConfig): number {
  * Get default model from configuration
  */
 export function getDefaultModel(config?: AppConfig): string {
-  return config?.defaultModel ?? "gpt-4.1-mini";
+  return config?.defaultModel ?? 'gpt-4.1-mini';
 }
 
 /**
  * Get fallback model from configuration
  */
 export function getFallbackModel(config?: AppConfig): string {
-  return config?.fallbackModel ?? "gpt-4.1";
+  return config?.fallbackModel ?? 'gpt-4.1';
 }
 
 /**

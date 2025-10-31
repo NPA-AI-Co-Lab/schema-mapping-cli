@@ -1,4 +1,4 @@
-import { handleCliShutdown } from "./shutdown.js";
+import { handleCliShutdown } from './shutdown.js';
 
 /**
  * CLI SIGINT handler for basic operations
@@ -12,12 +12,12 @@ export function setupCliSigintHandler(): void {
   if (cliSigintHandler) {
     return;
   }
-  
+
   cliSigintHandler = () => {
     handleCliShutdown();
   };
-  
-  process.on("SIGINT", cliSigintHandler);
+
+  process.on('SIGINT', cliSigintHandler);
 }
 
 /**
@@ -25,7 +25,7 @@ export function setupCliSigintHandler(): void {
  */
 export function removeCliSigintHandler(): void {
   if (cliSigintHandler) {
-    process.removeListener("SIGINT", cliSigintHandler);
+    process.removeListener('SIGINT', cliSigintHandler);
     cliSigintHandler = null;
   }
 }

@@ -1,12 +1,12 @@
-import { Ora } from "ora";
-import { countRows } from "./data-loader.js";
+import { Ora } from 'ora';
+import { countRows } from './data-loader.js';
 
 /**
  * Display warning message with spinner
  */
 export function warn(msg: string, spinner: Ora) {
   spinner.clear();
-  console.warn("⚠️ ", msg);
+  console.warn('⚠️ ', msg);
   spinner.start();
 }
 
@@ -29,11 +29,7 @@ function calculateSpeed(startTime: number, processedRows: number): string {
 /**
  * Generate spinner text with progress information
  */
-function parseSpinnerText(
-  processedRows: number,
-  totalRows: number,
-  startTime: number
-): string {
+function parseSpinnerText(processedRows: number, totalRows: number, startTime: number): string {
   if (processedRows > 0) {
     const percentage = ((processedRows / totalRows) * 100).toFixed(2);
     const speed = calculateSpeed(startTime, processedRows);

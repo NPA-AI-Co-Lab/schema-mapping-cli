@@ -1,13 +1,13 @@
-export { 
-  loadEnvConfig, 
-  loadAppConfig, 
+export {
+  loadEnvConfig,
+  loadAppConfig,
   loadGlobalConfig,
-  getBatchSize, 
-  getConcurrencySize, 
-  getDefaultModel, 
+  getBatchSize,
+  getConcurrencySize,
+  getDefaultModel,
   getFallbackModel,
-  isOpenAIConfigured, 
-  getOpenAIAPIKey 
+  isOpenAIConfigured,
+  getOpenAIAPIKey,
 } from './config.js';
 
 export { loadConfig } from './config-file-loader.js';
@@ -24,31 +24,33 @@ export { basePath, loadJSON } from './file-system.js';
 
 export { runWithRetries } from './retry.js';
 
-export { 
-  handleCliShutdown, 
-  analysisShutDown, 
-  createShutdownHandlerWithCleanup, 
-  withSigintHandler 
+export { getCurrentAttemptNumber } from './retry-context.js';
+
+export {
+  handleCliShutdown,
+  analysisShutDown,
+  createShutdownHandlerWithCleanup,
+  withSigintHandler,
 } from './shutdown.js';
 
-export { 
-  setupCliSigintHandler, 
-  removeCliSigintHandler, 
-  restoreCliSigintHandler 
+export {
+  setupCliSigintHandler,
+  removeCliSigintHandler,
+  restoreCliSigintHandler,
 } from './cli-sigint.js';
 
 export type { EnvConfig, AppConfig, FileConfig, ValidationResult } from './types.js';
 
 export { warn, bold, startSpinnerProgress } from './ui.js';
 
-export { 
-  validateOutputFile, 
-  validateCSVPath, 
-  validateJSONPath, 
+export {
+  validateOutputFile,
+  validateCSVPath,
+  validateJSONPath,
   splitValues,
   checkNotEmpty,
   checkPropertyExists,
-  addIfMissing 
+  addIfMissing,
 } from './validation.js';
 
 export { fixZodFromJsonSchema } from './zod-helpers.js';

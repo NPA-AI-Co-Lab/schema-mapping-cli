@@ -8,8 +8,8 @@ export class ValidationError extends Error {
     public readonly cause?: Error
   ) {
     super(message);
-    this.name = "ValidationError";
-    
+    this.name = 'ValidationError';
+
     if (cause) {
       this.stack = `${this.stack}\nCaused by: ${cause.stack}`;
     }
@@ -26,8 +26,8 @@ export class AnalysisError extends Error {
     public readonly cause?: Error
   ) {
     super(message);
-    this.name = "AnalysisError";
-    
+    this.name = 'AnalysisError';
+
     if (cause) {
       this.stack = `${this.stack}\nCaused by: ${cause.stack}`;
     }
@@ -38,8 +38,11 @@ export class AnalysisError extends Error {
  * Custom configuration error class
  */
 export class ConfigurationError extends Error {
-  constructor(message: string, public readonly configPath?: string) {
+  constructor(
+    message: string,
+    public readonly configPath?: string
+  ) {
     super(message);
-    this.name = "ConfigurationError";
+    this.name = 'ConfigurationError';
   }
 }

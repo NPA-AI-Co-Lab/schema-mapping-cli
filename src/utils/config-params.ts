@@ -1,13 +1,13 @@
-import path from "path";
-import prompts from "prompts";
-import { validateJSONPath } from "./validation.js";
-import { handleCliShutdown } from "./shutdown.js";
-import { loadConfig } from "./config-file-loader.js";
-import { loadAppConfig } from "./config.js";
-import { validateConfigPaths } from "./config-path-validator.js";
-import { createConfigPrompt, createOutputPrompt } from "./config-prompts.js";
-import { showOptionsSummary } from "./config-summary.js";
-import { AppConfig } from "./types.js";
+import path from 'path';
+import prompts from 'prompts';
+import { validateJSONPath } from './validation.js';
+import { handleCliShutdown } from './shutdown.js';
+import { loadConfig } from './config-file-loader.js';
+import { loadAppConfig } from './config.js';
+import { validateConfigPaths } from './config-path-validator.js';
+import { createConfigPrompt, createOutputPrompt } from './config-prompts.js';
+import { showOptionsSummary } from './config-summary.js';
+import { AppConfig } from './types.js';
 
 /**
  * Get app parameters from configuration file
@@ -29,11 +29,13 @@ export async function getAppParamsFromConfig(configPath: string): Promise<AppCon
     hidePII,
     retriesNumber,
     requiredFieldErrorsFailBatch,
+    uuidColumn,
+    rulesPath,
   } = loadConfig(resolvedConfigPath);
 
   if (!configOutputPath) {
     console.error(
-      "❌ When using --config argument, outputPath must be specified in the configuration file"
+      '❌ When using --config argument, outputPath must be specified in the configuration file'
     );
     process.exit(1);
   }
@@ -60,6 +62,8 @@ export async function getAppParamsFromConfig(configPath: string): Promise<AppCon
     concurrencySize: fullConfig.concurrencySize,
     defaultModel: fullConfig.defaultModel,
     fallbackModel: fullConfig.fallbackModel,
+    uuidColumn,
+    rulesPath: fullConfig.rulesPath ?? rulesPath,
   };
 }
 
@@ -67,14 +71,11 @@ export async function getAppParamsFromConfig(configPath: string): Promise<AppCon
  * Get app parameters via interactive prompts
  */
 export async function getAppParams(): Promise<AppConfig> {
-  const { configPath: inputConfigPath } = await prompts(
-    [createConfigPrompt()],
-    {
-      onCancel: () => {
-        handleCliShutdown();
-      },
-    }
-  );
+  const { configPath: inputConfigPath } = await prompts([createConfigPrompt()], {
+    onCancel: () => {
+      handleCliShutdown();
+    },
+  });
 
   const configPath = path.resolve(inputConfigPath);
 
@@ -86,6 +87,8 @@ export async function getAppParams(): Promise<AppConfig> {
     hidePII,
     retriesNumber,
     requiredFieldErrorsFailBatch,
+    uuidColumn,
+    rulesPath,
   } = loadConfig(configPath);
 
   const outputPath =
@@ -118,5 +121,7 @@ export async function getAppParams(): Promise<AppConfig> {
     concurrencySize: defaultConfig.concurrencySize,
     defaultModel: defaultConfig.defaultModel,
     fallbackModel: defaultConfig.fallbackModel,
+    uuidColumn,
+    rulesPath: defaultConfig.rulesPath ?? rulesPath,
   };
 }

@@ -1,5 +1,11 @@
-import { WrappedRequiredField, ValidationErrorDetails } from "./types.js";
-import { isValidObject, buildArrayItemPath, buildFieldPath, shouldSkipField, isWrappedRequiredField } from "./validation-utils.js";
+import { WrappedRequiredField, ValidationErrorDetails } from './types.js';
+import {
+  isValidObject,
+  buildArrayItemPath,
+  buildFieldPath,
+  shouldSkipField,
+  isWrappedRequiredField,
+} from './validation-utils.js';
 
 /**
  * Recursively validate object for required fields
@@ -16,13 +22,7 @@ export async function validateObjectRecursively(
   }
 
   if (Array.isArray(obj)) {
-    return await validateArrayObject(
-      obj,
-      batchIndex,
-      csvRowIndex,
-      fieldPath,
-      logValidationError
-    );
+    return await validateArrayObject(obj, batchIndex, csvRowIndex, fieldPath, logValidationError);
   }
 
   return await validateRecordObject(
@@ -138,7 +138,7 @@ async function validateWrappedRequiredField(
       csvLineEnd: csvRowIndex,
       fieldPath,
       errorMessage: `Required field '${fieldName}' is missing or null`,
-      expectedType: "non-null value",
+      expectedType: 'non-null value',
       actualValue: null,
       csvRowIndex,
     });

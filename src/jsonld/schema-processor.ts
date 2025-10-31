@@ -1,10 +1,10 @@
-import path from "path";
-import { loadJSON, basePath } from "../utils/file-system.js";
-import { JsonLdSchema } from "./types.js";
-import { preprocessRequiredFields } from "./required-fields.js";
-import { jsonLdToJsonSchema } from "./schema-converter.js";
+import path from 'path';
+import { loadJSON, basePath } from '../utils/file-system.js';
+import { JsonLdSchema } from './types.js';
+import { preprocessRequiredFields } from './required-fields.js';
+import { jsonLdToJsonSchema } from './schema-converter.js';
 
-const SKELETON_PATH = path.join(basePath, "static", "skeleton.json");
+const SKELETON_PATH = path.join(basePath, 'static', 'skeleton.json');
 
 /**
  * Generate LLM schema from JSON-LD schema file
@@ -27,7 +27,7 @@ export function getLLMSchema(jsonLdSchemaPath: string): JsonSchema {
   filled.properties.results = {
     ...(filled.properties.results as Record<string, unknown>),
     items: {
-      type: "object",
+      type: 'object',
       properties: entities as Record<string, unknown>,
       required: Object.keys(entities),
       additionalProperties: false,

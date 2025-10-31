@@ -1,4 +1,4 @@
-import { validateOutputFile, validateCSVPath, validateJSONPath } from "./validation.js";
+import { validateOutputFile, validateCSVPath, validateJSONPath } from './validation.js';
 
 /**
  * Validate all configuration paths

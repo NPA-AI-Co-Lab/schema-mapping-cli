@@ -18,7 +18,7 @@ export type JsonLdProperty = {
  * JSON-LD entity definition
  */
 export type JsonLdEntity = {
-  "@type": string;
+  '@type': string;
   idProp?: string;
   properties: Record<string, JsonLdProperty>;
 };
@@ -27,7 +27,7 @@ export type JsonLdEntity = {
  * Complete JSON-LD schema
  */
 export type JsonLdSchema = {
-  "@context": Record<string, string>;
+  '@context': Record<string, string>;
   entities: Record<string, JsonLdEntity>;
 };
 
@@ -67,9 +67,11 @@ export interface ValidationErrorDetails {
   actualValue: unknown;
   /** Specific CSV row index related to the error, if applicable */
   csvRowIndex?: number;
+  /** Retry attempt number for this validation, if applicable (1-based) */
+  attemptNumber?: number;
 }
 
-export type TaxonomyEntry = { 
-  notation: string; 
-  value: string; 
+export type TaxonomyEntry = {
+  notation: string;
+  value: string;
 };

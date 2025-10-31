@@ -1,21 +1,21 @@
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-import { statSync, accessSync, constants, readFileSync } from "fs";
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { statSync, accessSync, constants, readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export const basePath = path.join(__dirname, "..", "..");
+export const basePath = path.join(__dirname, '..', '..');
 
 /**
  * Load and parse a JSON file
  */
 export function loadJSON<T>(filename: string): T {
   const resolvedPath = path.resolve(filename);
-  
+
   try {
-    const content = readFileSync(resolvedPath, "utf-8");
+    const content = readFileSync(resolvedPath, 'utf-8');
     return JSON.parse(content);
   } catch (error) {
     if (error instanceof Error) {

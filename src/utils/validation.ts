@@ -1,5 +1,5 @@
-import path from "path";
-import { statSync, accessSync, constants } from "fs";
+import path from 'path';
+import { statSync, accessSync, constants } from 'fs';
 
 /**
  * Validate output file path for JSON-LD files
@@ -17,9 +17,9 @@ export function validateOutputFile(value: string): true | string {
   } catch {
     return `Output directory does not exist or is not writable: ${dir}`;
   }
-  
+
   const ext = path.extname(resolvedPath).toLowerCase();
-  if (ext !== ".jsonld") {
+  if (ext !== '.jsonld') {
     return `Unsupported output file extension: ${ext}`;
   }
 
@@ -31,13 +31,13 @@ export function validateOutputFile(value: string): true | string {
  */
 export function validateCSVPath(value: string): true | string {
   const resolvedPath = path.resolve(value);
-  
+
   try {
     const stats = statSync(resolvedPath);
     if (!stats.isFile()) {
       return `CSV path must point to a file: ${resolvedPath}`;
     }
-    if (path.extname(resolvedPath).toLowerCase() !== ".csv") {
+    if (path.extname(resolvedPath).toLowerCase() !== '.csv') {
       return `CSV file must have a .csv extension: ${resolvedPath}`;
     }
   } catch {
@@ -52,15 +52,13 @@ export function validateCSVPath(value: string): true | string {
  */
 export function validateJSONPath(value: string): true | string {
   const resolvedPath = path.resolve(value);
-  
+
   try {
     const stats = statSync(resolvedPath);
     if (!stats.isFile()) {
       return `JSON path must point to a file: ${resolvedPath}`;
     }
-    if (
-      ![".json", ".jsonld"].includes(path.extname(resolvedPath).toLowerCase())
-    ) {
+    if (!['.json', '.jsonld'].includes(path.extname(resolvedPath).toLowerCase())) {
       return `JSON file must have a .json or .jsonld extension: ${resolvedPath}`;
     }
   } catch {
@@ -84,7 +82,7 @@ export function splitValues(value: string): string[] {
  * Check if value is not empty (not null, undefined, or empty string)
  */
 export function checkNotEmpty(value: unknown): boolean {
-  return value !== null && value !== undefined && value !== "";
+  return value !== null && value !== undefined && value !== '';
 }
 
 /**

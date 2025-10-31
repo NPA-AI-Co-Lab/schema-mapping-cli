@@ -26,6 +26,14 @@ export interface AppConfig {
   defaultModel: string;
   /** Fallback model to use when primary model fails */
   fallbackModel: string;
+  /** Column name to use for UUID generation (defaults to email fields if not specified) */
+  uuidColumn?: string;
+  /** Optional path to deterministic rules configuration */
+  rulesPath?: string;
+  /** Enable checkpoint system for resume support (default: true) */
+  enableCheckpoints?: boolean;
+  /** Maximum number of results to keep in memory before flushing (default: 1000) */
+  streamingMemoryLimit?: number;
 }
 
 /**
@@ -39,8 +47,10 @@ export interface FileConfig {
   hidePII: boolean;
   retriesNumber: number;
   requiredFieldErrorsFailBatch: boolean;
+  /** Column name to use for UUID generation (defaults to email fields if not specified) */
+  uuidColumn?: string;
+  rulesPath?: string;
 }
-
 
 /**
  * Validation result type - can be true for success or string for error message

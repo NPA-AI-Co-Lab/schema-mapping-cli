@@ -1,11 +1,10 @@
-import path from "path";
-import { existsSync, readFileSync } from "fs";
-import { basePath } from "../utils/index.js";
-import { JsonLdProperty } from "./types.js";
-import { TaxonomyEntry } from "./types.js";
+import path from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { basePath } from '../utils/index.js';
+import { JsonLdProperty } from './types.js';
+import { TaxonomyEntry } from './types.js';
 
-const TAXONOMY_FOLDER = path.resolve(basePath, "taxonomies");
-
+const TAXONOMY_FOLDER = path.resolve(basePath, 'taxonomies');
 
 const taxonomyCache: Record<string, TaxonomyEntry[]> = {};
 
@@ -21,24 +20,24 @@ export function getTaxonomy(name: string): TaxonomyEntry[] {
     return [];
   }
 
-  const data: TaxonomyEntry[] = JSON.parse(readFileSync(filePath, "utf-8"));
+  const data: TaxonomyEntry[] = JSON.parse(readFileSync(filePath, 'utf-8'));
   taxonomyCache[name] = data;
   return data;
 }
 
 /**
  * Handle taxonomy enumeration for properties
+ * Note: Do NOT add null to the enum array - OpenAI rejects that!
+ * Nullability is handled by the 'nullable: true' property instead.
  */
-export function handleTaxonomyEnum(prop: JsonLdProperty): (string | null)[] | undefined {
+export function handleTaxonomyEnum(prop: JsonLdProperty): string[] | undefined {
   if (prop.enumFromTaxonomy) {
     const taxonomy = getTaxonomy(prop.enumFromTaxonomy);
     if (!taxonomy) {
       throw new Error(`Unknown taxonomy: ${prop.enumFromTaxonomy}`);
     }
-    const values: (string | null)[] = taxonomy.map((t) => t.value);
-    if (Array.isArray(prop.type) && prop.type.includes("null")) {
-      values.push(null);
-    }
+    // Return only the actual enum values, not null
+    const values: string[] = taxonomy.map((t) => t.value);
     return values;
   }
   return undefined;
@@ -48,5 +47,5 @@ export function handleTaxonomyEnum(prop: JsonLdProperty): (string | null)[] | un
  * Clear taxonomy cache (useful for testing)
  */
 export function clearTaxonomyCache(): void {
-  Object.keys(taxonomyCache).forEach(key => delete taxonomyCache[key]);
+  Object.keys(taxonomyCache).forEach((key) => delete taxonomyCache[key]);
 }

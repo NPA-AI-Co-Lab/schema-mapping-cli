@@ -1,11 +1,4 @@
-import {
-  ZodTypeAny,
-  ZodObject,
-  ZodString,
-  ZodArray,
-  ZodNumber,
-  ZodEnum,
-} from "zod";
+import { ZodTypeAny, ZodObject, ZodString, ZodArray, ZodNumber, ZodEnum } from 'zod';
 
 /**
  * JSON Schema interface for type safety
@@ -21,25 +14,25 @@ interface JsonSchema {
   minimum?: number;
   maximum?: number;
   enum?: unknown[];
+  nullable?: boolean;
 }
 
 /**
- * Apply nullability to Zod schema based on JSON schema type
+ * Apply nullability to Zod schema based on JSON schema type or nullable property
+ * For OpenAI's structured outputs, nullable fields should use .nullable() which makes them optional AND nullable
  */
 function applyNullability(zodObj: ZodTypeAny, schema: JsonSchema): ZodTypeAny {
-  const isNullable = Array.isArray(schema.type) && schema.type.includes("null");
+  const isNullable =
+    (Array.isArray(schema.type) && schema.type.includes('null')) || schema.nullable === true;
   return isNullable ? zodObj.nullable() : zodObj;
 }
 
 /**
  * Apply email format validation to Zod string
  */
-function applyEmailFormat(
-  zodString: ZodString,
-  isRequired: boolean
-): ZodTypeAny {
+function applyEmailFormat(zodString: ZodString, isRequired: boolean): ZodTypeAny {
   if (isRequired) {
-    return zodString.min(1, "Email is required").email();
+    return zodString.min(1, 'Email is required').email();
   }
   return zodString.email();
 }
@@ -70,22 +63,19 @@ function fixZodObjectFromSchema(
 /**
  * Fix Zod string schema from JSON schema
  */
-function fixZodStringFromSchema(
-  zodString: ZodString,
-  schema: JsonSchema
-): ZodTypeAny {
+function fixZodStringFromSchema(zodString: ZodString, schema: JsonSchema): ZodTypeAny {
   let updated = zodString;
 
-  if (schema.format === "email") {
-    const isRequired = !Array.isArray(schema.type) || !schema.type.includes("null");
+  if (schema.format === 'email') {
+    const isRequired = !Array.isArray(schema.type) || !schema.type.includes('null');
     updated = applyEmailFormat(updated, isRequired) as ZodString;
   }
 
-  if (typeof schema.minLength === "number") {
+  if (typeof schema.minLength === 'number') {
     updated = updated.min(schema.minLength);
   }
 
-  if (typeof schema.maxLength === "number") {
+  if (typeof schema.maxLength === 'number') {
     updated = updated.max(schema.maxLength);
   }
 
@@ -95,17 +85,14 @@ function fixZodStringFromSchema(
 /**
  * Fix Zod array schema from JSON schema
  */
-function fixZodArrayFromSchema(
-  zodArray: ZodArray<ZodTypeAny>,
-  schema: JsonSchema
-): ZodTypeAny {
+function fixZodArrayFromSchema(zodArray: ZodArray<ZodTypeAny>, schema: JsonSchema): ZodTypeAny {
   let updated = zodArray;
 
-  if (typeof schema.minItems === "number") {
+  if (typeof schema.minItems === 'number') {
     updated = updated.min(schema.minItems);
   }
 
-  if (typeof schema.maxItems === "number") {
+  if (typeof schema.maxItems === 'number') {
     updated = updated.max(schema.maxItems);
   }
 
@@ -115,17 +102,14 @@ function fixZodArrayFromSchema(
 /**
  * Fix Zod number schema from JSON schema
  */
-function fixZodNumberFromSchema(
-  zodNumber: ZodNumber,
-  schema: JsonSchema
-): ZodTypeAny {
+function fixZodNumberFromSchema(zodNumber: ZodNumber, schema: JsonSchema): ZodTypeAny {
   let updated = zodNumber;
 
-  if (typeof schema.minimum === "number") {
+  if (typeof schema.minimum === 'number') {
     updated = updated.min(schema.minimum);
   }
 
-  if (typeof schema.maximum === "number") {
+  if (typeof schema.maximum === 'number') {
     updated = updated.max(schema.maximum);
   }
 
@@ -145,10 +129,7 @@ function fixZodEnumFromSchema(
 /**
  * Fix Zod schema from JSON schema recursively
  */
-export function fixZodFromJsonSchema(
-  schema: JsonSchema,
-  zodObj: ZodTypeAny
-): ZodTypeAny {
+export function fixZodFromJsonSchema(schema: JsonSchema, zodObj: ZodTypeAny): ZodTypeAny {
   if (zodObj instanceof ZodObject) {
     return fixZodObjectFromSchema(zodObj, schema);
   }
