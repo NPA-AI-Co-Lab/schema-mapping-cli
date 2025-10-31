@@ -1,12 +1,16 @@
 {
   "name": "npa-ingest-insight-cli",
-  "version": "0.5.2",
+  "version": "0.8.2",
   "main": "cli.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
-    "lint": "eslint \"src/**/*.ts\" --config src/eslint.config.mjs"
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --config src/eslint.config.mjs",
+    "format": "prettier --write \"src/**/*.{ts,js,json}\" \"tests/**/*.{ts,js,json}\" \"*.{ts,js,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,js,json}\" \"tests/**/*.{ts,js,json}\" \"*.{ts,js,json}\"",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
   },
   "bin": {
     "npa-insight": "./dist/cli.js"
@@ -35,19 +39,24 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@types/esbuild-copy-static-files": "^0.1.4",
+    "@types/node": "^22.10.1",
     "@types/json-schema": "^7.0.15",
     "@types/prompts": "^2.4.9",
     "@types/uuid": "^10.0.0",
     "@vercel/ncc": "^0.38.3",
+    "@vitest/coverage-v8": "^2.1.8",
     "esbuild": "^0.25.9",
     "esbuild-copy-static-files": "^0.1.0",
     "eslint": "^9.32.0",
     "globals": "^16.3.0",
     "jiti": "^2.5.1",
+    "jsdom": "^25.0.1",
+    "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.0",
+    "vitest": "^2.1.8",
     "zod-to-json-schema": "^3.24.6"
   },
   "overrides": {

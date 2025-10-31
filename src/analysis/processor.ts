@@ -1,16 +1,24 @@
-import { ILLMClient, LLMAnalysisRequest } from "../interfaces/llm-client.interface.js";
-import { ZodTypeAny, ZodError } from "zod";
-import {ValidateResultsArgs} from "./types.js";
-import { ValidationErrorDetails } from "../jsonld/index.js";
-import { validateLength, validateZodSchema } from "./validation.js";
-import { validateRequiredFields, ValidationErrorDetails as JsonLdValidationErrorDetails } from "../jsonld/index.js";
+import { ILLMClient, LLMAnalysisRequest } from '../interfaces/llm-client.interface.js';
+import { ZodTypeAny, ZodError } from 'zod';
+import { ValidateResultsArgs } from './types.js';
+import { ValidationErrorDetails } from '../jsonld/index.js';
+import { validateLength, validateZodSchema } from './validation.js';
+import {
+  validateRequiredFields,
+  ValidationErrorDetails as JsonLdValidationErrorDetails,
+} from '../jsonld/index.js';
+import { DeterministicFieldResult } from './rules/types.js';
+import { RetryAttemptDetails } from '../logging.js';
 
 /**
  * Arguments for result decoding
  */
 export interface DecodeResultsArgs {
   rawOutput: Record<string, unknown>;
-  decodePII: (encodedRecords: Record<string, unknown>, encodingMap: EncodingMap) => Record<string, unknown>;
+  decodePII: (
+    encodedRecords: Record<string, unknown>,
+    encodingMap: EncodingMap
+  ) => Record<string, unknown>;
   encodingMap: EncodingMap;
 }
 
@@ -18,7 +26,7 @@ export interface DecodeResultsArgs {
  * Arguments for analysis processing
  */
 export interface ProcessBatchArgs {
-  llmClient: ILLMClient;
+  llmClient?: ILLMClient;
   instructions: string;
   zodSchema: ZodTypeAny;
   batchLength: number;
@@ -26,19 +34,30 @@ export interface ProcessBatchArgs {
   input: Array<{ role: 'user' | 'system' | 'assistant'; content: string }>;
   model: string;
   logValidationError?: (error: ValidationErrorDetails) => Promise<void>;
-  parseZodError?: (error: ZodError, batchIndex: number, csvLineStart: number, csvLineEnd: number, originalData?: Record<string, unknown>) => ValidationErrorDetails[];
+  parseZodError?: (
+    error: ZodError,
+    batchIndex: number,
+    csvLineStart: number,
+    csvLineEnd: number,
+    originalData?: Record<string, unknown>
+  ) => ValidationErrorDetails[];
+  logRetryAttempt?: (details: RetryAttemptDetails) => Promise<void>;
   csvLineStart: number;
-  decodePII: (encodedRecords: Record<string, unknown>, encodingMap: EncodingMap) => Record<string, unknown>;
+  decodePII: (
+    encodedRecords: Record<string, unknown>,
+    encodingMap: EncodingMap
+  ) => Record<string, unknown>;
   encodingMap: EncodingMap;
   requiredFieldErrorsFailBatch?: boolean;
+  prefills?: DeterministicFieldResult[];
 }
 
 /**
  * Adapt ValidationErrorDetails from JsonLD format to Analysis format
  */
 function adaptValidationError(
-  jsonldError: JsonLdValidationErrorDetails, 
-  csvLineStart: number, 
+  jsonldError: JsonLdValidationErrorDetails,
+  csvLineStart: number,
   batchSize: number
 ): ValidationErrorDetails {
   return {
@@ -53,6 +72,74 @@ function adaptValidationError(
   };
 }
 
+function mergeDeep(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...target };
+
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      result[key] = value;
+      continue;
+    }
+
+    if (value !== null && typeof value === 'object') {
+      const existing = result[key];
+      if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+        result[key] = mergeDeep(
+          existing as Record<string, unknown>,
+          value as Record<string, unknown>
+        );
+      } else {
+        result[key] = mergeDeep({}, value as Record<string, unknown>);
+      }
+      continue;
+    }
+
+    result[key] = value;
+  }
+
+  return result;
+}
+
+function canSkipLLM(
+  prefills: DeterministicFieldResult[] | undefined,
+  batchLength: number
+): boolean {
+  if (!prefills || prefills.length !== batchLength) {
+    return false;
+  }
+
+  return prefills.every((prefill) => prefill.pendingFields.size === 0);
+}
+
+function buildDeterministicOutput(prefills: DeterministicFieldResult[]): Record<string, unknown> {
+  const results = prefills.map((prefill) => prefill.mapped);
+  return { results };
+}
+
+function mergeDeterministicResults(
+  results: Record<string, unknown>[] | undefined,
+  prefills: DeterministicFieldResult[] | undefined
+): Record<string, unknown>[] {
+  if (!results || !prefills || prefills.length !== results.length) {
+    return results ?? [];
+  }
+
+  return results.map((result, index) => {
+    const deterministic = prefills[index];
+    if (!deterministic) {
+      return result;
+    }
+    return mergeDeep(result ?? {}, deterministic.mapped);
+  });
+}
+
 /**
  * Fetch analysis results using the LLM client
  */
@@ -65,7 +152,10 @@ export async function fetchAnalysis(
 ): Promise<Record<string, unknown>> {
   const request: LLMAnalysisRequest = {
     instructions,
-    input: input.map(msg => ({ role: msg.role as 'user' | 'system' | 'assistant', content: msg.content })),
+    input: input.map((msg) => ({
+      role: msg.role as 'user' | 'system' | 'assistant',
+      content: msg.content,
+    })),
     model,
     zodSchema,
   };
@@ -85,7 +175,9 @@ export function decodeResults(args: DecodeResultsArgs): Record<string, unknown> 
 /**
  * Validate analysis results
  */
-export async function validateResults(args: ValidateResultsArgs): Promise<Record<string, string>[]> {
+export async function validateResults(
+  args: ValidateResultsArgs
+): Promise<Record<string, string>[]> {
   const {
     output,
     zodSchema,
@@ -113,10 +205,10 @@ export async function validateResults(args: ValidateResultsArgs): Promise<Record
     };
 
     await validateRequiredFields(
-      output.results as Record<string, unknown>[], 
-      index, 
-      csvLineStart, 
-      adaptedLogValidationError, 
+      output.results as Record<string, unknown>[],
+      index,
+      csvLineStart,
+      adaptedLogValidationError,
       requiredFieldErrorsFailBatch
     );
   }
@@ -128,7 +220,7 @@ export async function validateResults(args: ValidateResultsArgs): Promise<Record
     parseZodError,
     index,
     csvLineStart,
-    batchLength
+    batchLength,
   });
 
   return validatedResults;
@@ -152,16 +244,21 @@ export async function processBatch(args: ProcessBatchArgs): Promise<Record<strin
     decodePII,
     encodingMap,
     requiredFieldErrorsFailBatch,
+    prefills,
   } = args;
 
-  // Fetch analysis from LLM
-  const rawOutput = await fetchAnalysis(
-    llmClient,
-    instructions,
-    input,
-    model,
-    zodSchema
-  );
+  const useDeterministicOnly = canSkipLLM(prefills, batchLength);
+
+  let rawOutput: Record<string, unknown>;
+
+  if (useDeterministicOnly && prefills) {
+    rawOutput = buildDeterministicOutput(prefills);
+  } else {
+    if (!llmClient) {
+      throw new Error('LLM client is not configured');
+    }
+    rawOutput = await fetchAnalysis(llmClient, instructions, input, model, zodSchema);
+  }
 
   // Decode PII if needed
   const output = decodeResults({
@@ -170,8 +267,14 @@ export async function processBatch(args: ProcessBatchArgs): Promise<Record<strin
     encodingMap,
   });
 
-  // Validate results
-  const validateArgs: ValidateResultsArgs = {
+  if (useDeterministicOnly && prefills) {
+    // Decode deterministic results before returning
+    const deterministicResults = prefills.map((prefill) => prefill.mapped);
+    const decoded = deterministicResults.map((result) => decodePII(result, encodingMap));
+    return decoded;
+  }
+
+  const validateArgs: ValidateResultsArgs & { failOnSchemaError?: boolean } = {
     output,
     zodSchema,
     logValidationError,
@@ -180,7 +283,21 @@ export async function processBatch(args: ProcessBatchArgs): Promise<Record<strin
     csvLineStart,
     batchLength,
     requiredFieldErrorsFailBatch,
+    failOnSchemaError: !!requiredFieldErrorsFailBatch,
   };
 
-  return await validateResults(validateArgs);
+  const validated = await validateResults(validateArgs);
+
+  // NOW merge deterministic results after validation
+  if (prefills) {
+    // Decode deterministic prefills before merging
+    const decodedPrefills = prefills.map((prefill) => ({
+      ...prefill,
+      mapped: decodePII(prefill.mapped, encodingMap),
+    }));
+    const merged = mergeDeterministicResults(validated, decodedPrefills);
+    return merged;
+  }
+
+  return validated;
 }

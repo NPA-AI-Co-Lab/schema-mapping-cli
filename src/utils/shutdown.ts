@@ -1,6 +1,5 @@
-import ora, { Ora } from "ora";
-import { bold } from "./ui.js";
-import { JsonLdSchema } from "../jsonld/types.js";
+import ora, { Ora } from 'ora';
+import { bold } from './ui.js';
 
 type OutputWriter = {
   write: (results: Record<string, unknown>[]) => Promise<void>;
@@ -11,7 +10,7 @@ type OutputWriter = {
  * Handle CLI shutdown (Ctrl+C without cleanup)
  */
 export function handleCliShutdown() {
-  console.log("\n" + bold(`⚠️  Process interrupted by user` + "\n"));
+  console.log('\n' + bold(`⚠️  Process interrupted by user` + '\n'));
   process.exit(0);
 }
 
@@ -23,19 +22,21 @@ export async function analysisShutDown(
   stopSpinnerUpdate: () => void,
   resultsWriter: OutputWriter,
   enableLogging: boolean = false,
-  flushLogs?: () => Promise<void>
+  flushLogs?: () => Promise<void>,
+  newResultsWritten?: boolean
 ) {
   spinner.stop();
   stopSpinnerUpdate();
 
-  console.log(bold("\n\n⚠️  Analysis interrupted - saving partial results..."));
-  const finalizeSpinner = ora("Finalizing...").start();
+  console.log(bold('\n\n⚠️  Analysis interrupted - finalizing...'));
+
+  const finalizeSpinner = ora('Finalizing...').start();
 
   if (resultsWriter.finalize) {
     try {
       await resultsWriter.finalize();
     } catch {
-      finalizeSpinner.fail("Failed to finalize output file");
+      finalizeSpinner.fail('Failed to finalize output file');
     }
   }
 
@@ -43,28 +44,26 @@ export async function analysisShutDown(
     try {
       await flushLogs();
     } catch {
-      finalizeSpinner.fail("Failed to flush logs");
+      finalizeSpinner.fail('Failed to flush logs');
     }
   }
 
-  finalizeSpinner.succeed("Partial results saved");
+  if (newResultsWritten === false) {
+    finalizeSpinner.succeed('Analysis stopped successfully (no new results to save)');
+  } else {
+    finalizeSpinner.succeed('Partial results saved');
+  }
 }
 
-/**
- * Create shutdown handler with cleanup logic for partial results
- */
 export function createShutdownHandlerWithCleanup(
   spinner: Ora,
   stopSpinnerUpdate: () => void,
   resultsWriter: OutputWriter,
-  allResults: Record<string, unknown>[],
-  batchCleanupRequiredFields: (results: Record<string, unknown>[], schema: JsonLdSchema) => Record<string, unknown>[],
-  mergeRecordsByUuidMap: (results: Record<string, unknown>[], schema: JsonSchema) => Record<string, unknown>[],
-  rawJsonLdSchema: JsonLdSchema,
-  schema: JsonSchema,
   enableLogging: boolean = false,
   flushLogs?: () => Promise<void>,
-  setErrorFlag?: () => void
+  setErrorFlag?: () => void,
+  saveCheckpoint?: () => Promise<void>,
+  newResultsWritten?: boolean
 ) {
   let shuttingDown = false;
 
@@ -76,15 +75,13 @@ export function createShutdownHandlerWithCleanup(
       setErrorFlag();
     }
 
-    try {
-      if (allResults.length > 0) {
-        console.log(`\n⚠️  Processing ${allResults.length} partial results before shutdown...`);
-        const cleanedResults = batchCleanupRequiredFields(allResults, rawJsonLdSchema);
-        const mergedOutput = mergeRecordsByUuidMap(cleanedResults, schema);
-        await resultsWriter.write(mergedOutput);
+    // Save checkpoint on interruption to allow resuming from this point
+    if (saveCheckpoint) {
+      try {
+        await saveCheckpoint();
+      } catch (error) {
+        console.warn(`Failed to save checkpoint during shutdown: ${error}`);
       }
-    } catch (cleanupError) {
-      console.error("Failed to process partial results during shutdown:", cleanupError);
     }
 
     await analysisShutDown(
@@ -92,7 +89,8 @@ export function createShutdownHandlerWithCleanup(
       stopSpinnerUpdate,
       resultsWriter,
       enableLogging,
-      flushLogs
+      flushLogs,
+      newResultsWritten
     );
 
     process.exit(0);
@@ -105,9 +103,9 @@ export function createShutdownHandlerWithCleanup(
  * Add SIGINT handler with cleanup removal
  */
 export function withSigintHandler(handler: () => void | Promise<void>) {
-  process.prependListener("SIGINT", handler);
+  process.prependListener('SIGINT', handler);
 
   return () => {
-    process.removeListener("SIGINT", handler);
+    process.removeListener('SIGINT', handler);
   };
 }
