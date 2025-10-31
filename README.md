@@ -20,8 +20,9 @@ All other configuration is handled through the `config.json` file for better mai
 
 You can customize the LLM settings in your `config.json`:
 
-- **defaultModel**: Primary model to use (e.g., "gpt-5", "gpt-5-mini", "gpt-4.1")
+- **defaultModel**: Primary model to use (e.g., "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo")
 - **fallbackModel**: Backup model when primary fails
+- **uuidColumn**: Column name for UUID generation (defaults to email fields)
 - **batchSize**: Number of records per API request (1-50)
 - **concurrencySize**: Concurrent API requests (1-20)
 
@@ -90,7 +91,9 @@ Create a configuration file (`config.json`) with your data and schema paths:
   "batchSize": 5,
   "concurrencySize": 5,
   "defaultModel": "gpt-4o-mini",
-  "fallbackModel": "gpt-4o"
+  "fallbackModel": "gpt-4o",
+  "uuidColumn": "primaryEmail",
+  "rulesPath": "./config/sample_comments.rules.json"
 }
 ```
 
@@ -105,6 +108,62 @@ Create a configuration file (`config.json`) with your data and schema paths:
 - **concurrencySize** - Maximum number of asynchronous prompts that can run at once;
 - **defaultModel** - The model that will analyze the data by default (it is possible to change LLM versions as you like);
 - **fallbackModel** - The model that will handle analysis when the default model fails;
+- **uuidColumn** - The column name to use for UUID generation. If not specified, defaults to email fields (primaryEmail, email, etc.). This allows you to generate consistent UUIDs based on any unique identifier column in your data.
+- **rulesPath** - Optional path to a deterministic mapping file. When provided, the CLI will map rows rule-first and only invoke the LLM for unresolved fields.
+
+### Deterministic rules file
+
+Rules live in a separate JSON file so you can iterate on deterministic mappings without touching the schema. A simplified example (`config/sample_comments.rules.json`) is shown below:
+
+```json
+{
+  "schema": "../examples/schema.jsonld",
+  "llm": {
+    "default": false,
+    "fields": []
+  },
+  "fields": {
+    "person.userID": {
+      "source": "userID",
+      "transforms": ["trim"]
+    },
+    "action.published": {
+      "source": ["action_published", "obj_published"],
+      "transforms": ["trim"]
+    }
+  }
+}
+```
+
+- `schema` is resolved relative to the rules file and must match the JSON-LD used at runtime.
+- `llm.default` toggles whether the LLM is used by default. When set to `false`, only fields listed in `llm.fields` are delegated to the model (e.g. `"fields": ["person.intent", "object.summary"]`).
+- `fields` maps schema paths to CSV columns. Each rule can try multiple sources (`source` accepts an array), apply transforms, reference taxonomy enums, and define literal fallbacks.
+- When fields are delegated to the LLM, the CLI builds a minimal prompt/schema for just those paths and merges the model’s answers back into the deterministic record.
+
+> **Important:** The streaming processor merges output records using the schema’s identifier property (the one declared via `idProp`). Because the CLI injects a synthetic column based on your configured `uuidColumn` (or fallback email), make sure your deterministic rules map that value into the corresponding schema field. In the sample schema the id property is `person.userID`, so we include `"person.userID": { "source": "userID", "transforms": ["trim"] }`. Without that mapping, otherwise-deterministic rows will be skipped as “missing UUIDs.”
+
+Supported transforms are:
+
+- `trim` – remove leading/trailing whitespace from strings (runs element-wise for arrays).
+- `lowercase` / `uppercase` – change casing; when arrays are provided the change applies to each string item.
+- `split` – break a string into an array; accepts `delimiter` (defaults to `,`), `trimItems` (default `true`), and `filterEmpty` (default `true`).
+- `map` – substitute values via a dictionary; optional `caseInsensitive` flag (default `true`) performs case-insensitive matching and also applies to array items.
+- `toNumber` – convert numeric strings to JavaScript numbers; empty strings resolve to `undefined`.
+- `secondsToDuration` – convert numeric seconds into ISO-8601 duration strings (e.g. `300` → `PT300S`).
+- `filterEmpty` – drop empty/blank items from string arrays.
+- `unique` – deduplicate array entries (case-insensitive for strings).
+
+Required schema fields are wrapped automatically as `{ value, present }` so they validate against the "present" convention and are unwrapped before writing JSON-LD.
+
+### CLI overrides
+
+Deterministic behaviour can be tuned per run:
+
+- `--rules <file>` – use a different rules file for the current invocation.
+- `--llm-fields field1,field2` – force specific schema paths through the LLM even if rules exist.
+- `--no-llm-fields field1,field2` – keep the listed paths deterministic for this run.
+
+With a complete rules file you can run the CLI without an `OPENAI_API_KEY`; the pipeline skips LLM calls when every row is satisfied deterministically.
 
 ### Schema file
 
@@ -268,6 +327,32 @@ Here **idProp** specifies which of the properties will constitute the **@id** of
 
 You can also find examples of [config](./config.json) and [schema](./examples/schema.jsonld) files in the repository.
 
+### PII encoding file
+
+```
+{
+  "name": { "placeholder": "NAME_{ind}" },
+  "names": { "placeholder": "NAME_{ind}", "multi": true },
+
+  "email": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
+  "emailaddress": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
+  "primaryemail": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
+  "emails": { "placeholder": "EMAIL_{ind}@GMAIL.COM", "multi": true },
+
+  "phone": { "placeholder": "PHONE_{ind}" },
+  "phonenumber": { "placeholder": "PHONE_{ind}" },
+  "phonenumbers": { "placeholder": "PHONE_{ind}", "multi": true }
+}
+```
+
+This file is located inside the **./static** folder. It specifies which columns will be encoded, and what placeholder will the agent see in their place. There is also an optional **multi** attribute, which allows parsing of several PII entities, separated by a delimiter, in a single column.
+
+***Important***:
+
+If there are other PII fields you want to hide - please, add them to the file. For column names, use lower case, with no spaces. Placeholder has to contain "{ind}".
+Example: Email Address -> “emailaddress”: { “placeholder”: “EMAIL_{ind}@GMAIL.COM” }.
+
+
 ### Restrictions
 
 There are several ways to enforce rules onto the fields of your schema. Most important among them:
@@ -324,10 +409,47 @@ When using the `--config` argument:
 - All configuration must be specified in the config file, including `outputPath`
 - Perfect for automation, CI/CD pipelines, and integration with other systems
 
-## Linting
+## Code Quality
 
-The project uses ESLint. For details on how to run the linting, please
-refer to [typescript-eslint](https://typescript-eslint.io/getting-started).
+### Linting and Formatting
+
+The project uses ESLint for code linting and Prettier for consistent code formatting:
+
+```bash
+# Run ESLint
+npm run lint
+
+# Run Prettier formatting
+npm run format
+
+# Check Prettier formatting
+npm run format:check
+```
+
+For details on linting configuration, please refer to [typescript-eslint](https://typescript-eslint.io/getting-started).
+
+### Testing
+
+The project includes a comprehensive test suite with 100% coverage across all core functionality:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+**Test Coverage:**
+- **Validation testing** - Length checks, Zod schema validation, required fields
+- **Error handling** - Retry logic, error classification, complex scenarios
+- **PII handling** - Detection, encoding/decoding, data protection
+- **Batch processing** - Memory management, large dataset handling
+- **LLM client** - API integration, fallback mechanisms
+- **Schema conversion** - Data transformation and validation
 
 ## Project Structure
 

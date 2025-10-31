@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2025-10-28
+
+### Fixed
+
+- Better error handling;
+
+## [0.8.1] - 2025-10-22
+
+### Added
+
+- Better memory handling;
+- Analysis resumption;
+
+### Fixed
+
+- Better error handling;
+
+## [0.8.0] - 2025-10-21
+
+### Added
+
+- Support of rule-based processing;
+- Proper UUID handling with ability to specify generating field;
+- Better logging
+
+
+## [0.7.1] - 2025-10-07
+
+### Fixed
+
+- Included test files to linting;
+
+
+## [0.7.0] - 2025-10-02
+
+### Added
+
+- Unittests;
+- More inline comments;
+- Prettier formatting;
+
+## [0.6.0] - 2025-10-02
+
+### Added
+
+- PII handing in free text - catching common types (email, phone, address) via regex;
+
+### Fixed
+
+- Better handling for not missing objectID;
+- "requiredFieldErrorsFailBatch" flag behavior fix;
+
+### Fixed
+
+- Added SemVer mention in README.md;
+
+## [0.5.3] - 2025-06-10
+
+### Fixed
+
+- Added "emailaddress" pii field, as well as guidelines about pii to README.
+
+
 ## [0.5.2] - 2025-09-29
 
 ### Fixed

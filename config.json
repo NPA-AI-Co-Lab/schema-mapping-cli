@@ -1,13 +1,15 @@
 {
-    "dataPath": "./examples/sample_comments.csv",
-    "schemaPath": "./examples/schema.jsonld",
-    "outputPath": "./analysis_results.jsonld",
-    "enableLogging": true,
-    "hidePII": true,
-    "retriesNumber": 2,
-    "requiredFieldErrorsFailBatch": false,
-    "batchSize": 5,
-    "concurrencySize": 5,
-    "defaultModel": "gpt-4.1-mini",
-    "fallbackModel": "gpt-4.1"
+  "dataPath": "./examples/sample_comments.csv",
+  "schemaPath": "./examples/schema.jsonld",
+  "outputPath": "./analysis_results.jsonld",
+  "enableLogging": true,
+  "hidePII": true,
+  "retriesNumber": 2,
+  "requiredFieldErrorsFailBatch": false,
+  "batchSize": 5,
+  "concurrencySize": 5,
+  "defaultModel": "gpt-4.1-mini",
+  "fallbackModel": "gpt-4.1",
+  "uuidColumn": "primaryEmail",
+  "rulesPath": "./config/sample_comments.rules.json"
 }

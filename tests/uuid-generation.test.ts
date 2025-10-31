@@ -1,0 +1,382 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  extractEmails,
+  extractUuidValues,
+  getUuidForPerson,
+  assignUuidsToBatch,
+} from '../src/emailUuid.js';
+
+// Mock file system utilities to prevent basePath issues during testing
+vi.mock('../src/utils/file-system.js', () => ({
+  basePath: '/mock/base/path',
+  loadJSON: vi.fn(),
+  pathExists: vi.fn(),
+  isDirectoryWritable: vi.fn(),
+  resolvePath: vi.fn((path: string) => path),
+}));
+
+// Mock config utilities to prevent configuration loading issues during testing
+vi.mock('../src/utils/config.js', () => ({
+  loadEnvConfig: vi.fn(() => ({})),
+  loadAppConfig: vi.fn(() => ({
+    batchSize: 100,
+    concurrencySize: 5,
+    defaultModel: 'test-model',
+    fallbackModel: 'fallback-model',
+  })),
+  loadGlobalConfig: vi.fn(() => ({
+    BATCH_SIZE: 100,
+    CONC_SIZE: 5,
+    DEFAULT_MODEL: 'test-model',
+    FALLBACK_MODEL: 'fallback-model',
+  })),
+  getBatchSize: vi.fn(() => 100),
+  getConcurrencySize: vi.fn(() => 5),
+  getDefaultModel: vi.fn(() => 'test-model'),
+  getFallbackModel: vi.fn(() => 'fallback-model'),
+  isOpenAIConfigured: vi.fn(() => false),
+  getOpenAIAPIKey: vi.fn(() => ''),
+}));
+
+// Mock jsonld module to prevent taxonomy loading issues during testing
+vi.mock('../src/jsonld/index.js', () => ({
+  getTaxonomy: vi.fn(() => []),
+  handleTaxonomyEnum: vi.fn(),
+  clearTaxonomyCache: vi.fn(),
+  convertProperty: vi.fn(),
+  convertEntityToJsonSchema: vi.fn(),
+  jsonLdToJsonSchema: vi.fn(),
+  getLLMSchema: vi.fn(),
+  convertSingleEntityToJsonLd: vi.fn(),
+  convertArrayEntitiesToJsonLd: vi.fn(),
+  llmOutputToJsonLd: vi.fn(),
+  createJsonLDWriter: vi.fn(),
+  batchCleanupRequiredFields: vi.fn((results: any) => results),
+  validateRequiredFields: vi.fn(),
+  validateObjectRecursively: vi.fn(),
+  isValidObject: vi.fn(),
+  isWrappedRequiredField: vi.fn(),
+  shouldSkipField: vi.fn(),
+  buildArrayItemPath: vi.fn(),
+  buildFieldPath: vi.fn(),
+}));
+
+// Mock UUID functions for predictable testing
+vi.mock('uuid', () => ({
+  v5: vi.fn((value: string) => `uuid-v5-${value.replace(/[^a-zA-Z0-9]/g, '-')}`),
+  v4: vi.fn(() => 'uuid-v4-random'),
+}));
+
+describe('UUID Generation', () => {
+  beforeEach(() => {
+    // Clear any cached UUIDs between tests
+    vi.clearAllMocks();
+  });
+
+  describe('extractEmails', () => {
+    it('should extract emails from standard email fields', () => {
+      const person = {
+        email: 'test@example.com',
+        primaryEmail: 'primary@example.com',
+        name: 'John Doe',
+      };
+
+      const emails = extractEmails(person);
+
+      expect(emails).toEqual(['test@example.com', 'primary@example.com']);
+    });
+
+    it('should extract multiple emails from additionalEmails field', () => {
+      const person = {
+        email: 'test@example.com',
+        additionalEmails: 'alt1@example.com, alt2@example.com',
+        name: 'John Doe',
+      };
+
+      const emails = extractEmails(person);
+
+      expect(emails).toEqual(['test@example.com', 'alt1@example.com', 'alt2@example.com']);
+    });
+
+    it('should handle empty and invalid email fields', () => {
+      const person = {
+        email: '',
+        primaryEmail: '   ',
+        invalidField: 'not-an-email',
+        name: 'John Doe',
+      };
+
+      const emails = extractEmails(person);
+
+      expect(emails).toEqual([]);
+    });
+
+    it('should normalize email case', () => {
+      const person = {
+        email: 'TEST@EXAMPLE.COM',
+        primaryEmail: 'Primary@Example.Com',
+      };
+
+      const emails = extractEmails(person);
+
+      expect(emails).toEqual(['test@example.com', 'primary@example.com']);
+    });
+  });
+
+  describe('extractUuidValues', () => {
+    it('should fall back to email extraction when no uuidColumn is specified', () => {
+      const person = {
+        email: 'test@example.com',
+        userID: 'user123',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person);
+
+      expect(values).toEqual(['test@example.com']);
+    });
+
+    it('should extract value from specified uuid column', () => {
+      const person = {
+        email: 'test@example.com',
+        userID: 'user123',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person, 'userID');
+
+      expect(values).toEqual(['user123']);
+    });
+
+    it('should handle comma-separated values in uuid column', () => {
+      const person = {
+        email: 'test@example.com',
+        tags: 'tag1, tag2, tag3',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person, 'tags');
+
+      expect(values).toEqual(['tag1', 'tag2', 'tag3']);
+    });
+
+    it('should normalize values to lowercase', () => {
+      const person = {
+        category: 'PREMIUM,SUBSCRIBER',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person, 'category');
+
+      expect(values).toEqual(['premium', 'subscriber']);
+    });
+
+    it('should fall back to email for non-existent column', () => {
+      const person = {
+        email: 'test@example.com',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person, 'nonExistent');
+
+      expect(values).toEqual(['test@example.com']);
+    });
+
+    it('should fall back to email for empty uuid column value', () => {
+      const person = {
+        email: 'test@example.com',
+        userID: '',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person, 'userID');
+
+      expect(values).toEqual(['test@example.com']);
+    });
+
+    it('should return empty array when no uuid column and no email available', () => {
+      const person = {
+        name: 'John Doe',
+        userID: '',
+      };
+
+      const values = extractUuidValues(person, 'userID');
+
+      expect(values).toEqual([]);
+    });
+  });
+
+  describe('getUuidForPerson', () => {
+    it('should generate UUID from email when no uuidColumn specified', () => {
+      const person = {
+        email: 'test@example.com',
+        name: 'John Doe',
+      };
+
+      const uuid = getUuidForPerson(person);
+
+      expect(uuid).toBe('uuid-v5-test-example-com');
+    });
+
+    it('should generate UUID from specified column', () => {
+      const person = {
+        email: 'test@example.com',
+        userID: 'user123',
+        name: 'John Doe',
+      };
+
+      const uuid = getUuidForPerson(person, 'userID');
+
+      expect(uuid).toBe('uuid-v5-user123');
+    });
+
+    it('should generate random UUID when no values available', () => {
+      const person = {
+        name: 'John Doe',
+      };
+
+      const uuid = getUuidForPerson(person);
+
+      expect(uuid).toBe('uuid-v4-random');
+    });
+
+    it('should use first value when multiple values available', () => {
+      const person = {
+        tags: 'tag1, tag2, tag3',
+        name: 'John Doe',
+      };
+
+      const uuid = getUuidForPerson(person, 'tags');
+
+      expect(uuid).toBe('uuid-v5-tag1');
+    });
+  });
+
+  describe('assignUuidsToBatch', () => {
+    it('should assign UUIDs based on email when no uuidColumn specified', () => {
+      const batch = [
+        { email: 'user1@example.com', name: 'User 1' },
+        { email: 'user2@example.com', name: 'User 2' },
+      ];
+
+      const result = assignUuidsToBatch(batch);
+
+      expect(result[0].userID).toBe('uuid-v5-user1-example-com');
+      expect(result[1].userID).toBe('uuid-v5-user2-example-com');
+    });
+
+    it('should assign UUIDs based on specified column', () => {
+      const batch = [
+        { email: 'user1@example.com', userID: 'u001', name: 'User 1' },
+        { email: 'user2@example.com', userID: 'u002', name: 'User 2' },
+      ];
+
+      const result = assignUuidsToBatch(batch, 'userID');
+
+      expect(result[0].userID).toBe('uuid-v5-u001');
+      expect(result[1].userID).toBe('uuid-v5-u002');
+    });
+
+    it('should reuse UUIDs for identical values', () => {
+      const batch = [
+        { email: 'same@example.com', name: 'User 1' },
+        { email: 'same@example.com', name: 'User 2' },
+        { email: 'different@example.com', name: 'User 3' },
+      ];
+
+      const result = assignUuidsToBatch(batch);
+
+      // First two should have same UUID, third should be different
+      expect(result[0].userID).toBe(result[1].userID);
+      expect(result[0].userID).not.toBe(result[2].userID);
+      expect(result[0].userID).toBe('uuid-v5-same-example-com');
+      expect(result[2].userID).toBe('uuid-v5-different-example-com');
+    });
+
+    it('should handle mixed scenarios with and without values', () => {
+      const batch = [
+        { email: 'user1@example.com', name: 'User 1', userID: '' },
+        { name: 'User 2', userID: '', email: '' }, // No email, empty uuid column
+        { userID: 'u003', name: 'User 3', email: '' },
+      ];
+
+      const result = assignUuidsToBatch(batch, 'userID');
+
+      expect(result[0].userID).toBe('uuid-v5-user1-example-com'); // Has email, uses that
+      expect(result[1].userID).toBe('uuid-v4-random'); // Empty userID and email, falls back to random
+      expect(result[2].userID).toBe('uuid-v5-u003'); // Has userID
+    });
+
+    it('should handle null/undefined records gracefully', () => {
+      const batch = [
+        { email: 'user1@example.com', name: 'User 1' },
+        null as any,
+        undefined as any,
+        { email: 'user2@example.com', name: 'User 2' },
+      ];
+
+      const result = assignUuidsToBatch(batch);
+
+      expect(result[0].userID).toBe('uuid-v5-user1-example-com');
+      expect(result[1]).toBeNull();
+      expect(result[2]).toBeUndefined();
+      expect(result[3].userID).toBe('uuid-v5-user2-example-com');
+    });
+
+    it('should preserve existing record properties', () => {
+      const batch = [
+        {
+          email: 'user1@example.com',
+          name: 'User 1',
+          age: '30',
+          active: 'true',
+        },
+      ];
+
+      const result = assignUuidsToBatch(batch);
+
+      expect(result[0]).toEqual({
+        email: 'user1@example.com',
+        name: 'User 1',
+        age: '30',
+        active: 'true',
+        userID: 'uuid-v5-user1-example-com',
+      });
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle whitespace in values', () => {
+      const person = {
+        userID: '  user123  ',
+        name: 'John Doe',
+      };
+
+      const values = extractUuidValues(person, 'userID');
+      expect(values).toEqual(['user123']);
+
+      const uuid = getUuidForPerson(person, 'userID');
+      expect(uuid).toBe('uuid-v5-user123');
+    });
+
+    it('should handle special characters in uuid values', () => {
+      const person = {
+        userID: 'user@123#special',
+        name: 'John Doe',
+      };
+
+      const uuid = getUuidForPerson(person, 'userID');
+      expect(uuid).toBe('uuid-v5-user-123-special');
+    });
+
+    it('should handle mixed case in column names (case insensitive email detection)', () => {
+      const person = {
+        EMAIL: 'test@example.com',
+        Name: 'John Doe',
+      };
+
+      const emails = extractEmails(person);
+      expect(emails).toEqual(['test@example.com']);
+    });
+  });
+});
