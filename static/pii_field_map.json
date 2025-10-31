@@ -9,6 +9,7 @@
   "nickname": { "placeholder": "NAME_{ind}" },
 
   "email": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
+  "emailaddress": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
   "primaryemail": { "placeholder": "EMAIL_{ind}@GMAIL.COM" },
   "emails": { "placeholder": "EMAIL_{ind}@GMAIL.COM", "multi": true },
   "additionalemails": { "placeholder": "EMAIL_{ind}@GMAIL.COM", "multi": true },

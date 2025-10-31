@@ -166,7 +166,7 @@
             "properties": {
                 "objectID": {
                     "type": "string",
-                    "description": "This could potentially be a hashed uuid, but most commonly will be a URI, for example the URL for an article or survey.",
+                    "description": "This could potentially be a hashed uuid, but most commonly will be a URI, for example the URL for an article or survey. If not immediately obvious and present in correct format, do not try to imagine / infer it - leave it as null.",
                     "pattern": "^(https?:\\/\\/)?([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}(:\\d+)?(\\/[^\\s]*)?$",
                     "required": true
                 },
@@ -245,7 +245,7 @@
                 "published": {
                     "type": "string",
                     "format": "date-time",
-                    "description": "Date-time when the action occurred. RFC 3339 format, e.g., 2023-06-25T14:33:42Z",
+                    "description": "Date-time when the action occurred. RFC 3339 format, e.g., 2023-06-25T14:33:42Z.",
                     "required": true
                 },
                 "timeSpent": {
