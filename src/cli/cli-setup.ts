@@ -1,34 +1,42 @@
-import { Command } from "commander";
-import { CliOptions, PackageInfo } from "./cli-types.js";
-import { runAnalyzeCommand } from "./cli-commands.js";
+import { Command } from 'commander';
+import { CliOptions, PackageInfo } from './cli-types.js';
+import { runAnalyzeCommand } from './cli-commands.js';
 
 /**
  * Setup and configure the CLI program with commands and options
  */
 export function setupCliProgram(program: Command, pkg: PackageInfo) {
-  program.name(pkg.name).description(pkg.description || '').version(pkg.version);
+  program
+    .name(pkg.name)
+    .description(pkg.description || '')
+    .version(pkg.version);
 
   // Configure the analyze command
   program
-    .command("analyze")
-    .description("Analyze CSV data using AI and output structured results")
-    .option("-i, --input <file>", "Input CSV file path")
-    .option("-s, --schema <file>", "JSON-LD schema file path")
-    .option("-o, --output <file>", "Output file path (optional, use stdout if not specified)")
-    .option("-c, --config <file>", "Configuration file path (defaults override config file)")
-    .option("--batch-size <number>", "Number of records per batch (1-50)")
-    .option("--concurrency <number>", "Number of concurrent requests (1-20)")
-    .option("--retries <number>", "Number of retry attempts (0-10)")
-    .option("--model <name>", "LLM model name (e.g., gpt-4.1-mini)")
-    .option("--fallback-model <name>", "Fallback LLM model name")
-    .option("--logging", "Enable detailed logging")
-    .option("--hide-pii", "Enable PII protection")
-    .option("--required-fields-fail-batch", "Fail entire batch on required field errors")
-    .option("--stdout", "Output results to stdout instead of file")
-    .option("-q, --quiet", "Suppress informational output (stderr)")
+    .command('analyze')
+    .description('Analyze CSV data using AI and output structured results')
+    .option('-i, --input <file>', 'Input CSV file path')
+    .option('-s, --schema <file>', 'JSON-LD schema file path')
+    .option('-o, --output <file>', 'Output file path (optional, use stdout if not specified)')
+    .option('-c, --config <file>', 'Configuration file path (defaults override config file)')
+    .option('--rules <file>', 'Deterministic rules configuration file path')
+    .option('--batch-size <number>', 'Number of records per batch (1-50)')
+    .option('--concurrency <number>', 'Number of concurrent requests (1-20)')
+    .option('--retries <number>', 'Number of retry attempts (0-10)')
+    .option('--model <name>', 'LLM model name (e.g., gpt-4.1-mini)')
+    .option('--fallback-model <name>', 'Fallback LLM model name')
+    .option('--llm-fields <fields>', 'Comma-separated list of fields to resolve via LLM')
+    .option('--no-llm-fields <fields>', 'Comma-separated list of fields to keep deterministic')
+    .option('--logging', 'Enable detailed logging')
+    .option('--hide-pii', 'Enable PII protection')
+    .option('--required-fields-fail-batch', 'Fail entire batch on required field errors')
+    .option('--stdout', 'Output results to stdout instead of file')
+    .option('-q, --quiet', 'Suppress informational output (stderr)')
     .action((options: CliOptions) => runAnalyzeCommand(options, pkg));
 
-  program.addHelpText('after', `
+  program.addHelpText(
+    'after',
+    `
 
 Examples:
   # Interactive mode (traditional usage)
@@ -39,6 +47,12 @@ Examples:
 
   # Override config with CLI options
   ${pkg.name} analyze -c config.json --batch-size 10 --model gpt-4.1
+
+  # Run with deterministic rules and no LLM fields
+  ${pkg.name} analyze -c config.json --rules ./config/sample_comments.rules.json
+
+  # Delegate specific fields to the LLM
+  ${pkg.name} analyze --rules ./config/sample_comments.rules.json --llm-fields object.responses
 
   # CLI-only (no config file)
   ${pkg.name} analyze -i data.csv -s schema.jsonld -o results.jsonld
@@ -56,5 +70,6 @@ Note:
   - Running without -i/--input or -c/--config will start interactive mode
   - Use --stdout for UNIX-style pipeline compatibility
   - Use --quiet to suppress informational messages for scripting
-`);
+`
+  );
 }

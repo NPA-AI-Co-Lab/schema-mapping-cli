@@ -2,4 +2,4 @@
  * CLI module exports
  */
 
-export { setupCliProgram } from "./cli-setup.js";
+export { setupCliProgram } from './cli-setup.js';
