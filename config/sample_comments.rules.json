@@ -1,0 +1,163 @@
+{
+  "schema": "../examples/schema.jsonld",
+  "llm": {
+    "default": false,
+    "fields": [
+      "person.engagementScore",
+      "person.consentType",
+      "person.demographics.ageGroup",
+      "person.demographics.gender",
+      "person.demographics.educationLevel",
+      "person.demographics.incomeBracket",
+      "person.behavior.donorStatus",
+      "person.interests.topics",
+      "person.interests.commentedOn"
+    ]
+  },
+  "fields": {
+    "person.userID": {
+      "source": "userID",
+      "transforms": ["trim"]
+    },
+    "person.primaryEmail": {
+      "source": "primaryEmail",
+      "transforms": ["trim"]
+    },
+    "person.additionalEmails": {
+      "source": "additionalEmails",
+      "transforms": [
+        {
+          "type": "split",
+          "delimiter": ",",
+          "trimItems": true,
+          "filterEmpty": true
+        }
+      ]
+    },
+    "person.givenName": {
+      "source": "givenName",
+      "transforms": ["trim"]
+    },
+    "person.familyName": {
+      "source": "familyName",
+      "transforms": ["trim"]
+    },
+    "person.tags": {
+      "source": "tags",
+      "transforms": [
+        {
+          "type": "split",
+          "delimiter": ",",
+          "trimItems": true,
+          "filterEmpty": true
+        },
+        "unique"
+      ]
+    },
+    "person.dataSource": {
+      "source": "dataSource",
+      "transforms": ["trim"]
+    },
+    "person.location.postalCode": {
+      "source": "postalCode",
+      "transforms": ["trim"]
+    },
+    "person.location.addressCountry": {
+      "source": "addressCountry",
+      "transforms": ["trim", "uppercase"]
+    },
+    "person.location.addressLocality": {
+      "source": "addressLocality",
+      "transforms": ["trim"]
+    },
+    "object.objectID": {
+      "source": "obj_id",
+      "transforms": ["trim"]
+    },
+    "object.title": {
+      "source": "obj_title",
+      "transforms": ["trim"]
+    },
+    "object.type": {
+      "source": "obj_type",
+      "transforms": ["trim", "lowercase"],
+      "taxonomy": "ObjectType-v1",
+      "fallback": "article"
+    },
+    "object.subType": {
+      "source": "obj_subType",
+      "transforms": ["trim"]
+    },
+    "object.published": {
+      "source": "obj_published",
+      "transforms": ["trim"]
+    },
+    "object.subject": {
+      "source": "obj_subject",
+      "transforms": [
+        {
+          "type": "split",
+          "delimiter": ",",
+          "trimItems": true,
+          "filterEmpty": true
+        },
+        "unique"
+      ]
+    },
+    "object.dataSource": {
+      "source": "dataSource",
+      "transforms": ["trim"]
+    },
+    "action.actionType": {
+      "source": "action_type",
+      "transforms": [
+        "trim",
+        {
+          "type": "map",
+          "values": {
+            "newsletterclick": "newsletter_click",
+            "newsletteropen": "newsletter_open",
+            "webread": "web_read"
+          }
+        }
+      ],
+      "taxonomy": "ActionType-v1"
+    },
+    "action.person": {
+      "source": "userID",
+      "transforms": ["trim"]
+    },
+    "action.object": {
+      "source": "obj_id",
+      "transforms": ["trim"]
+    },
+    "action.referrer": {
+      "source": "action_referrer",
+      "transforms": ["trim"]
+    },
+    "action.published": {
+      "source": ["action_published", "obj_published"],
+      "transforms": ["trim"]
+    },
+    "action.timeSpent": {
+      "source": "action_timeSpent",
+      "transforms": [
+        "trim",
+        { "type": "toNumber" },
+        { "type": "secondsToDuration" }
+      ]
+    },
+    "action.completionRate": {
+      "source": "action_completionRate",
+      "transforms": ["trim", { "type": "toNumber" }]
+    },
+    "action.dataSource": {
+      "source": ["action_dataSource", "dataSource"],
+      "transforms": ["trim"]
+    },
+    "action.deviceContext.userAgent": {
+      "source": "action_userAgent",
+      "transforms": ["trim"]
+    }
+  }
+}
