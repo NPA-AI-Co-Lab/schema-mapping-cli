@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
-import { 
-  ILLMClient, 
-  LLMAnalysisRequest, 
+import {
+  ILLMClient,
+  LLMAnalysisRequest,
   LLMAnalysisResponse,
-  LLMError 
+  LLMError,
 } from '../interfaces/llm-client.interface.js';
 
 /**
@@ -19,8 +19,8 @@ export class OpenAILLMClient implements ILLMClient {
     if (!apiKey) {
       throw new Error('OpenAI API key is required');
     }
-    
-    this.client = new OpenAI({ apiKey });
+
+    this.client = new OpenAI({ apiKey, timeout: 60_000 });
     this.defaultModel = defaultModel;
     this.fallbackModel = fallbackModel;
   }
@@ -32,7 +32,7 @@ export class OpenAILLMClient implements ILLMClient {
         instructions: request.instructions,
         input: request.input,
         text: {
-          format: zodTextFormat(request.zodSchema, "entities"),
+          format: zodTextFormat(request.zodSchema, 'entities'),
         },
       });
 
