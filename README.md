@@ -8,7 +8,15 @@ The tool features a modular architecture with pluggable LLM providers, making it
 
 ### Environment Variables
 
-The application uses a `.env` file for sensitive credentials only:
+The application uses a `.env` file for sensitive credentials only. 
+
+You can copy it from `.env-sample` as follows:
+
+```
+cp .env-sample .env
+```
+
+From there, edit the file to contain your OpenAI API key:
 
 ```bash
 OPENAI_API_KEY=your_api_key_here
