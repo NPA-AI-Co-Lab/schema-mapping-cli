@@ -6,3 +6,4 @@ playground/
 logging/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+.env
