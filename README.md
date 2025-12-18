@@ -1,4 +1,4 @@
-# NPA Ingest Insight CLI
+# Audience Data Commons: Schema Mapping CLI
 
 A command-line tool for analyzing and structuring data using Language Model APIs. This CLI processes CSV data files and outputs structured analysis results in JSON-LD format according to a customizable schema.
 
