@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [2.1.0] -2026-03-02
+
+### Added
+
+- `forceReingestion` configuration option;
+- Better DB logic and deduplication;
+- Clear error messages;
+
+## [2.0.0] - 2026-02-23
+
+### Added
+
+- Multi-file CSV processing with UUID-based merging
+- SQLite persistence layer with a seven-table schema
+- Resume modes: `auto`, `fresh`, `resume`
+- File ingestion manager and file tracking (SHA256)
+- Configuration normalization for legacy single-file configs
+- `dataPaths` and `databasePath` configuration options
+- Database-backed streaming processing and repository pattern
+
+### Changed
+
+- Checkpoint files replaced by SQLite (breaking)
+- Pipeline redesigned for multi-file processing
+- CLI now uses `pipeline-db.ts`
+- Streaming processor queries the database instead of using in-memory maps
+
+### Fixed
+
+- Resume reliability and concurrent processing (WAL mode)
+- Memory usage for large datasets
+
+### Documentation
+
+- Updated `README.md` multi-file processing section
+
+## [0.8.4] - 2025-10-29
+
+### Fixed
+
+- Retry logic;
+- Duplicate column handling;
+
+## [0.8.3] - 2025-10-29
+
+### Fixed
+
+- Small client configuration fix for better performance;
+
 ## [0.8.2] - 2025-10-28
 
 ### Fixed

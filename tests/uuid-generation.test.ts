@@ -213,9 +213,10 @@ describe('UUID Generation', () => {
         name: 'John Doe',
       };
 
-      const uuid = getUuidForPerson(person);
+      const result = getUuidForPerson(person);
 
-      expect(uuid).toBe('uuid-v5-test-example-com');
+      expect(result.uuid).toBe('uuid-v5-test-example-com');
+      expect(result.isRandom).toBe(false);
     });
 
     it('should generate UUID from specified column', () => {
@@ -225,9 +226,10 @@ describe('UUID Generation', () => {
         name: 'John Doe',
       };
 
-      const uuid = getUuidForPerson(person, 'userID');
+      const result = getUuidForPerson(person, 'userID');
 
-      expect(uuid).toBe('uuid-v5-user123');
+      expect(result.uuid).toBe('uuid-v5-user123');
+      expect(result.isRandom).toBe(false);
     });
 
     it('should generate random UUID when no values available', () => {
@@ -235,9 +237,10 @@ describe('UUID Generation', () => {
         name: 'John Doe',
       };
 
-      const uuid = getUuidForPerson(person);
+      const result = getUuidForPerson(person);
 
-      expect(uuid).toBe('uuid-v4-random');
+      expect(result.uuid).toBe('uuid-v4-random');
+      expect(result.isRandom).toBe(true);
     });
 
     it('should use first value when multiple values available', () => {
@@ -246,9 +249,10 @@ describe('UUID Generation', () => {
         name: 'John Doe',
       };
 
-      const uuid = getUuidForPerson(person, 'tags');
+      const result = getUuidForPerson(person, 'tags');
 
-      expect(uuid).toBe('uuid-v5-tag1');
+      expect(result.uuid).toBe('uuid-v5-tag1');
+      expect(result.isRandom).toBe(false);
     });
   });
 
@@ -259,10 +263,11 @@ describe('UUID Generation', () => {
         { email: 'user2@example.com', name: 'User 2' },
       ];
 
-      const result = assignUuidsToBatch(batch);
+      const { batch: result, randomCount } = assignUuidsToBatch(batch);
 
       expect(result[0].userID).toBe('uuid-v5-user1-example-com');
       expect(result[1].userID).toBe('uuid-v5-user2-example-com');
+      expect(randomCount).toBe(0);
     });
 
     it('should assign UUIDs based on specified column', () => {
@@ -271,10 +276,11 @@ describe('UUID Generation', () => {
         { email: 'user2@example.com', userID: 'u002', name: 'User 2' },
       ];
 
-      const result = assignUuidsToBatch(batch, 'userID');
+      const { batch: result, randomCount } = assignUuidsToBatch(batch, 'userID');
 
       expect(result[0].userID).toBe('uuid-v5-u001');
       expect(result[1].userID).toBe('uuid-v5-u002');
+      expect(randomCount).toBe(0);
     });
 
     it('should reuse UUIDs for identical values', () => {
@@ -284,13 +290,14 @@ describe('UUID Generation', () => {
         { email: 'different@example.com', name: 'User 3' },
       ];
 
-      const result = assignUuidsToBatch(batch);
+      const { batch: result, randomCount } = assignUuidsToBatch(batch);
 
       // First two should have same UUID, third should be different
       expect(result[0].userID).toBe(result[1].userID);
       expect(result[0].userID).not.toBe(result[2].userID);
       expect(result[0].userID).toBe('uuid-v5-same-example-com');
       expect(result[2].userID).toBe('uuid-v5-different-example-com');
+      expect(randomCount).toBe(0);
     });
 
     it('should handle mixed scenarios with and without values', () => {
@@ -300,11 +307,12 @@ describe('UUID Generation', () => {
         { userID: 'u003', name: 'User 3', email: '' },
       ];
 
-      const result = assignUuidsToBatch(batch, 'userID');
+      const { batch: result, randomCount } = assignUuidsToBatch(batch, 'userID');
 
       expect(result[0].userID).toBe('uuid-v5-user1-example-com'); // Has email, uses that
       expect(result[1].userID).toBe('uuid-v4-random'); // Empty userID and email, falls back to random
       expect(result[2].userID).toBe('uuid-v5-u003'); // Has userID
+      expect(randomCount).toBe(1); // One random UUID generated
     });
 
     it('should handle null/undefined records gracefully', () => {
@@ -315,12 +323,13 @@ describe('UUID Generation', () => {
         { email: 'user2@example.com', name: 'User 2' },
       ];
 
-      const result = assignUuidsToBatch(batch);
+      const { batch: result, randomCount } = assignUuidsToBatch(batch);
 
       expect(result[0].userID).toBe('uuid-v5-user1-example-com');
       expect(result[1]).toBeNull();
       expect(result[2]).toBeUndefined();
       expect(result[3].userID).toBe('uuid-v5-user2-example-com');
+      expect(randomCount).toBe(0);
     });
 
     it('should preserve existing record properties', () => {
@@ -333,7 +342,7 @@ describe('UUID Generation', () => {
         },
       ];
 
-      const result = assignUuidsToBatch(batch);
+      const { batch: result, randomCount } = assignUuidsToBatch(batch);
 
       expect(result[0]).toEqual({
         email: 'user1@example.com',
@@ -342,6 +351,7 @@ describe('UUID Generation', () => {
         active: 'true',
         userID: 'uuid-v5-user1-example-com',
       });
+      expect(randomCount).toBe(0);
     });
   });
 
@@ -355,8 +365,9 @@ describe('UUID Generation', () => {
       const values = extractUuidValues(person, 'userID');
       expect(values).toEqual(['user123']);
 
-      const uuid = getUuidForPerson(person, 'userID');
-      expect(uuid).toBe('uuid-v5-user123');
+      const result = getUuidForPerson(person, 'userID');
+      expect(result.uuid).toBe('uuid-v5-user123');
+      expect(result.isRandom).toBe(false);
     });
 
     it('should handle special characters in uuid values', () => {
@@ -365,8 +376,9 @@ describe('UUID Generation', () => {
         name: 'John Doe',
       };
 
-      const uuid = getUuidForPerson(person, 'userID');
-      expect(uuid).toBe('uuid-v5-user-123-special');
+      const result = getUuidForPerson(person, 'userID');
+      expect(result.uuid).toBe('uuid-v5-user-123-special');
+      expect(result.isRandom).toBe(false);
     });
 
     it('should handle mixed case in column names (case insensitive email detection)', () => {

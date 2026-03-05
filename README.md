@@ -93,13 +93,17 @@ Create a configuration file (`config.json`) with your data and schema paths:
   "defaultModel": "gpt-4o-mini",
   "fallbackModel": "gpt-4o",
   "uuidColumn": "primaryEmail",
-  "rulesPath": "./config/sample_comments.rules.json"
+    "rulesPath": "./config/sample_comments.rules.json",
+    "forceReingestion": false
 }
 ```
 
-- **dataPath** specifies the path to the input CSV file;
+- **dataPath** specifies the path to the input CSV file (legacy, single-file mode);
+- **dataPaths** specifies an array of input CSV file paths (multi-file mode) - see [Multi-File Processing](#multi-file-processing) below;
 - **schemaPath** specifies the path to schema that the output will be based on;
 - **outputPath** specifies the path where results will be saved. Required when using `--config` argument, optional for interactive mode;
+- **databasePath** (optional) specifies where the SQLite database should be created. Auto-derived from outputPath if omitted;
+- **resumeMode** (optional) controls resume behavior: `"auto"` (default), `"fresh"`, or `"resume"`;
 - **enableLogging** enables/disables logging of AI prompts and error messages into separate files;
 - **hidePII** enables/disables PII handling logic.
 - **retriesNumber** specifies how many retries the program will make on an erroneous API response before stopping the analysis.
@@ -110,6 +114,50 @@ Create a configuration file (`config.json`) with your data and schema paths:
 - **fallbackModel** - The model that will handle analysis when the default model fails;
 - **uuidColumn** - The column name to use for UUID generation. If not specified, defaults to email fields (primaryEmail, email, etc.). This allows you to generate consistent UUIDs based on any unique identifier column in your data.
 - **rulesPath** - Optional path to a deterministic mapping file. When provided, the CLI will map rows rule-first and only invoke the LLM for unresolved fields.
+
+### Multi-File Processing
+
+The tool supports processing multiple CSV files in a single run. You can provide either a single `dataPath` (legacy single-file mode) or an array `dataPaths` to process multiple files together. When multiple files are provided the pipeline:
+
+- assigns a global, stable UUID per record (based on the configured `uuidColumn` or a default set of email fields),
+- stores raw rows and intermediate results in a local SQLite database, and
+- merges records with the same UUID into a single JSON-LD output entity.
+
+Example configuration (multi-file):
+
+```json
+{
+    "dataPaths": [
+        "./data/file1.csv",
+        "./data/file2.csv",
+        "./data/file3.csv"
+    ],
+    "schemaPath": "./schema.jsonld",
+    "outputPath": "./output/results.jsonld",
+    "databasePath": "./output/results.db",
+    "uuidColumn": "primaryEmail"
+}
+```
+
+Behavior notes:
+
+- Database persistence: the pipeline writes ingestion state, per-row LLM results, and merged output into an SQLite database. The `databasePath` can be provided in the config or is auto-derived from `outputPath`.
+- Resume and interruption: processing can be interrupted (Ctrl+C). On the next run the pipeline will resume from the last saved state when possible; intermediate results are not lost.
+- File tracking: files are tracked by content hash so identical files are skipped and each file's status is recorded.
+
+Behavior for edited files and partial ingests:
+
+- If a file with the same content hash was already ingested and status is `completed`, the file is skipped.
+- If a previous ingest exists for the same content but is incomplete/failed, the pipeline will remove the previous partial record and re-ingest the file (resume behavior for same-hash files).
+- If a previous ingest exists for the same file path but the content hash differs (the file was edited after a partial ingest), the default behavior is to throw a clear error and refuse to overwrite existing partial data to avoid accidental data loss. Use the `forceReingestion: true` configuration option to allow the CLI to delete the previous partial records and re-ingest the edited file.
+
+Resume modes (configurable via `resumeMode`):
+
+- `auto` (default): resume when the saved pipeline config matches the current run; if the config changed the pipeline starts fresh.
+- `fresh`: clear the existing database and start from scratch.
+- `resume`: attempt to resume and fail if the saved configuration differs from the current run.
+
+Backward compatibility: single-file configs using `dataPath` are still supported and are internally normalized to `dataPaths: [dataPath]`.
 
 ### Deterministic rules file
 

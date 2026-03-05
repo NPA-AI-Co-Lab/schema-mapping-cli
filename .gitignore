@@ -7,3 +7,5 @@ logging/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 .env
+*.db
+local_scripts/

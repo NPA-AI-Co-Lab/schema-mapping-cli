@@ -25,6 +25,11 @@ type Person = {
   [key: string]: unknown;
 };
 
+type UuidResult = {
+  uuid: string;
+  isRandom: boolean;
+};
+
 function validateValue(value: string): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -93,7 +98,7 @@ export function getUuidForPerson(
   person: RecordData,
   uuidColumn?: string,
   logUuidGeneration?: (details: UuidGenerationDetails) => Promise<void>
-): string {
+): UuidResult {
   const values = extractUuidValues(person, uuidColumn, logUuidGeneration);
   if (values.length > 0) {
     const uuid = uuidv5(values[0], NAMESPACE);
@@ -105,7 +110,7 @@ export function getUuidForPerson(
         generatedUuid: uuid,
       });
     }
-    return uuid;
+    return { uuid, isRandom: false };
   }
 
   const uuid = uuidv4();
@@ -118,15 +123,16 @@ export function getUuidForPerson(
       fallbackReason: `No valid UUID values found (no email or ${uuidColumn ? `'${uuidColumn}' column` : 'email columns'}), generating random UUID`,
     });
   }
-  return uuid;
+  return { uuid, isRandom: true };
 }
 
 export function assignUuidsToBatch(
   batch: RecordData[],
   uuidColumn?: string,
   logUuidGeneration?: (details: UuidGenerationDetails) => Promise<void>
-): RecordData[] {
-  return batch.map((row) => {
+): { batch: RecordData[]; randomCount: number } {
+  let randomCount = 0;
+  const mapped = batch.map((row) => {
     if (!row) return row;
     const values = extractUuidValues(row, uuidColumn, logUuidGeneration);
     let assignedUuid: string | undefined;
@@ -147,7 +153,9 @@ export function assignUuidsToBatch(
       }
     }
     if (!assignedUuid) {
-      assignedUuid = getUuidForPerson(row, uuidColumn, logUuidGeneration);
+      const res = getUuidForPerson(row, uuidColumn, logUuidGeneration);
+      assignedUuid = res.uuid;
+      if (res.isRandom) randomCount++;
     }
     for (const value of values) {
       VALUE_TO_UUID.set(value, assignedUuid);
@@ -155,6 +163,8 @@ export function assignUuidsToBatch(
     row.userID = assignedUuid;
     return row;
   });
+
+  return { batch: mapped, randomCount };
 }
 
 function getUuidRecordMap(allResults: AnalysisResult[]): Map<string, Person[]> {

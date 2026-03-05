@@ -7,7 +7,7 @@ import { JsonLDWriter } from './types.js';
  */
 export function createJsonLDWriter(outputPath: string, jsonLdSchemaPath: string): JsonLDWriter {
   let isFirst = true;
-  const stream = outputPath ? createWriteStream(outputPath) : process.stdout;
+  const stream = outputPath ? createWriteStream(outputPath, { flags: 'w' }) : process.stdout;
 
   if (stream !== process.stdout) {
     (stream as WriteStream).write('[\n');
@@ -17,6 +17,11 @@ export function createJsonLDWriter(outputPath: string, jsonLdSchemaPath: string)
 
   return {
     write: async (results: Record<string, unknown>[]) => {
+
+      if (!Array.isArray(results) || results.length === 0) {
+        return;
+      }
+      
       for (const result of results) {
         const jsonLdResult = llmOutputToJsonLd(jsonLdSchemaPath, result);
         if (!isFirst) {
@@ -56,6 +61,10 @@ export function createAppendingJsonLDWriter(
   outputPath: string,
   jsonLdSchemaPath: string
 ): JsonLDWriter {
+  if (!outputPath) {
+    return createJsonLDWriter(outputPath, jsonLdSchemaPath);
+  }
+
   // For resuming, we don't overwrite the file - we create a no-op writer
   // since completed UUIDs are already handled by the streaming processor
   return {

@@ -4,15 +4,17 @@ import { validateOutputFile, validateCSVPath, validateJSONPath } from './validat
  * Validate all configuration paths
  */
 export function validateConfigPaths(
-  dataPath: string,
+  dataPaths: string[],
   schemaPath: string,
   outputPath: string
 ): boolean {
   const errors: string[] = [];
 
-  const dataCheck = validateCSVPath(dataPath);
-  if (dataCheck !== true) {
-    errors.push(`Data file error: ${dataCheck}`);
+  for (const dataPath of dataPaths) {
+    const dataCheck = validateCSVPath(dataPath);
+    if (dataCheck !== true) {
+      errors.push(`Data file (${dataPath}) error: ${dataCheck}`);
+    }
   }
 
   const schemaCheck = validateJSONPath(schemaPath);

@@ -23,4 +23,4 @@ setupCliSigintHandler();
 
 setupCliProgram(program, pkg);
 
-program.parse();
+program.parse(process.argv);

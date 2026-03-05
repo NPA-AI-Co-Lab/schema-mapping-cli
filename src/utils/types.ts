@@ -11,9 +11,14 @@ export interface EnvConfig {
  * Configuration structure for the application
  */
 export interface AppConfig {
-  dataPath: string;
+  /** Single file path (legacy support) */
+  dataPath?: string;
+  /** Multiple file paths (new multi-file support) */
+  dataPaths?: string[];
   schemaPath: string;
   outputPath: string;
+  /** Database path for persistence (auto-derived if not specified) */
+  databasePath?: string;
   enableLogging: boolean;
   hidePII: boolean;
   retriesNumber: number;
@@ -30,19 +35,26 @@ export interface AppConfig {
   uuidColumn?: string;
   /** Optional path to deterministic rules configuration */
   rulesPath?: string;
-  /** Enable checkpoint system for resume support (default: true) */
-  enableCheckpoints?: boolean;
-  /** Maximum number of results to keep in memory before flushing (default: 1000) */
-  streamingMemoryLimit?: number;
+  /** Runtime LLM field overrides (include/exclude specific fields from LLM) */
+  llmFieldOverrides?: { include?: string[]; exclude?: string[] };
+  /** Resume mode: 'auto' (default), 'fresh', or 'resume' */
+  resumeMode?: 'auto' | 'fresh' | 'resume';
+  /** If true, allow edited files to forcefully remove previously ingested records and re-ingest */
+  forceReingestion?: boolean;
 }
 
 /**
  * Configuration from file with optional output path
  */
 export interface FileConfig {
-  dataPath: string;
+  /** Single file path (legacy support) */
+  dataPath?: string;
+  /** Multiple file paths (new multi-file support) */
+  dataPaths?: string[];
   schemaPath: string;
   configOutputPath: string;
+  /** Database path for persistence (auto-derived if not specified) */
+  databasePath?: string;
   enableLogging: boolean;
   hidePII: boolean;
   retriesNumber: number;
@@ -50,6 +62,10 @@ export interface FileConfig {
   /** Column name to use for UUID generation (defaults to email fields if not specified) */
   uuidColumn?: string;
   rulesPath?: string;
+  /** If true, allow edited files to forcefully remove previously ingested records and re-ingest */
+  forceReingestion?: boolean;
+  /** Resume mode: 'auto' (default), 'fresh', or 'resume' */
+  resumeMode?: 'auto' | 'fresh' | 'resume';
 }
 
 /**

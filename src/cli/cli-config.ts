@@ -3,6 +3,7 @@ import { CliOptions } from './cli-types.js';
 
 /**
  * Check if we should use interactive mode
+ * Interactive mode is used when no config, no input, and not using stdout
  */
 export function shouldUseInteractiveMode(options: CliOptions): boolean {
   return !options.input && !options.config && !options.stdout;
