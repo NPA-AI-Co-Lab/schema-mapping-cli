@@ -10,11 +10,17 @@ export {
   getOpenAIAPIKey,
 } from './config.js';
 
-export { loadConfig } from './config-file-loader.js';
 export { validateConfigPaths } from './config-path-validator.js';
 export { createConfigPrompt, createOutputPrompt } from './config-prompts.js';
 export { showOptionsSummary } from './config-summary.js';
 export { getAppParams, getAppParamsFromConfig } from './config-params.js';
+export {
+  normalizeConfig,
+  validateConfig,
+  getFilePaths,
+  createConfigHash,
+  calculateFileHash,
+} from './config-normalizer.js';
 
 export { loadInstructions, loadData, enumerateAsync } from './data-loader.js';
 

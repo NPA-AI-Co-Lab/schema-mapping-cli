@@ -124,6 +124,8 @@ async function handleFailedAttempt(
       });
     }
 
+    console.error(`❌ Skipping batch index ${args.index} due to LLM error:`, error.message);
+
     throw new AbortError(error instanceof Error ? error : String(error));
   }
 

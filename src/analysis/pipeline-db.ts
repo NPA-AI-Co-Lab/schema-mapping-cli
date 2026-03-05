@@ -1,0 +1,539 @@
+/**
+ * Database-backed analysis pipeline with multi-file CSV ingestion
+ * Replaces checkpoint-based system with SQLite persistence
+ */
+
+import path from 'path';
+import { existsSync } from 'fs';
+import ora, { Ora } from 'ora';
+import { convertJsonSchemaToZod } from 'zod-from-json-schema';
+import { resolveRefs } from 'json-refs';
+import pLimit from 'p-limit';
+import { ZodTypeAny } from 'zod';
+
+import { ILLMClient } from '../interfaces/llm-client.interface.js';
+import { LLMClientFactory } from '../clients/llm-client-factory.js';
+import {
+  loadInstructions,
+  fixZodFromJsonSchema,
+  loadJSON,
+  runWithRetries,
+  basePath,
+  normalizeConfig,
+  validateConfig,
+  getFilePaths,
+  createConfigHash,
+} from '../utils/index.js';
+import {
+  getLLMSchema,
+  createJsonLDWriter,
+  createAppendingJsonLDWriter,
+  JsonLdSchema,
+} from '../jsonld/index.js';
+import { createLogger } from '../logging.js';
+import { createPIIHandlers } from '../pii_handling/pii_handling.js';
+import type { RecordData } from '../pii_handling/types.js';
+import { processBatch } from './processor.js';
+import { buildPartialSchema } from './rules/partial-schema.js';
+import { loadRulesConfig, transformRow } from './rules/index.js';
+import { DbStreamingProcessor } from './db-streaming-processor.js';
+import { FileIngestionManager } from './file-ingestion.js';
+import type { DeterministicFieldResult, LoadedRules } from './rules/index.js';
+import { DatabaseManager, deriveDatabasePath } from '../database/index.js';
+import type { AppConfig } from '../utils/types.js';
+
+type JsonSchema = Record<string, unknown>;
+type DbMode = 'fresh' | 'resume';
+type OutputMode = 'rewrite' | 'append';
+
+const INSTRUCTION_PATH = path.resolve(basePath, 'static', 'instructions.txt');
+
+/**
+ * Main database-backed analysis function for multi-file CSV processing
+ */
+export async function analyzeDataWithDb(
+  config: AppConfig,
+  llmClient?: ILLMClient,
+  quiet: boolean = false
+) {
+  // Normalize and validate configuration
+  const normalizedConfig = normalizeConfig(config);
+  validateConfig(normalizedConfig);
+
+  const {
+    schemaPath,
+    outputPath,
+    databasePath,
+    enableLogging,
+    hidePII: enablePiiProcessing,
+    retriesNumber,
+    requiredFieldErrorsFailBatch,
+    batchSize,
+    concurrencySize,
+    defaultModel,
+    uuidColumn,
+    rulesPath,
+    llmFieldOverrides,
+    resumeMode,
+    forceReingestion,
+  } = normalizedConfig;
+
+  const filePaths = getFilePaths(normalizedConfig);
+  const dbPath = databasePath || deriveDatabasePath(outputPath);
+
+  if (!quiet) {
+    console.log(`\n🗄️  Database: ${dbPath}`);
+    console.log(`📁 Processing ${filePaths.length} file(s)`);
+    for (const fp of filePaths) {
+      console.log(`   - ${path.basename(fp)}`);
+    }
+  }
+
+  // Initialize database
+  const db = new DatabaseManager(dbPath);
+  db.connect();
+
+  
+
+  try {
+    // Check resume mode
+    const existingConfigHash = db.state.getConfigHash();
+    const currentConfigHash = createConfigHash(normalizedConfig);
+    const isResume = existingConfigHash !== null;
+    let dbMode: DbMode = 'fresh';
+
+    if (isResume) {
+      if (resumeMode === 'fresh') {
+        if (!quiet) {
+          console.log('🔄 Fresh mode: Clearing existing database');
+        }
+        db.clearAllData();
+        dbMode = 'fresh';
+      } else if (resumeMode === 'resume' || resumeMode === 'auto') {
+        // Validate config hasn't changed
+        if (existingConfigHash !== currentConfigHash) {
+          if (resumeMode === 'resume') {
+            throw new Error(
+              'Configuration has changed since last run. Use --resume-mode=fresh to start over.'
+            );
+          } else {
+            if (!quiet) {
+              console.log('⚠️  Configuration changed. Starting fresh.');
+            }
+            db.clearAllData();
+            dbMode = 'fresh';
+          }
+        } else {
+          dbMode = 'resume';
+          if (!quiet) {
+            const progress = db.state.getProcessingProgress();
+            console.log(
+              `📁 Resuming from database (${progress.processed_rows}/${progress.total_rows} rows, ${progress.completed_uuids}/${progress.total_uuids} UUIDs)`
+            );
+          }
+        }
+      }
+    }
+
+    // Decide output handling separately from DB resume behavior.
+    const previousOutputPath = db.state.getConfig('output_path');
+    const outputPathChanged = previousOutputPath !== null && previousOutputPath !== outputPath;
+    const outputFileExists = !outputPath || existsSync(outputPath);
+
+    // Save configuration
+    db.state.saveConfigHash(currentConfigHash);
+    // Persist current output path for future runs
+    db.state.setConfig('output_path', outputPath);
+
+    // Append only on stable resume + same path + existing output file.
+    const configUnchanged = existingConfigHash !== null && existingConfigHash === currentConfigHash;
+    let outputMode: OutputMode =
+      dbMode === 'resume' && configUnchanged && !outputPathChanged && outputFileExists
+        ? 'append'
+        : 'rewrite';
+
+    if (outputMode === 'rewrite') {
+      if (!quiet) {
+        if (outputPathChanged) {
+          console.log(
+            `Output path changed from '${previousOutputPath}' to '${outputPath}': rewriting output from database.`
+          );
+        } else if (!outputFileExists && outputPath) {
+          console.log(`Output file '${outputPath}' not found: rewriting output from database.`);
+        } else {
+          console.log('Writing output in rewrite mode from current database state.');
+        }
+      }
+
+      db.getConnection()
+        .getDb()
+        .prepare('UPDATE merged_output SET written_to_file = 0, written_at = NULL')
+        .run();
+    } else {
+      if (!quiet) console.log('Resuming analysis in append mode');
+    }
+    db.state.markProcessingStarted();
+
+    // Load schema and setup
+    const schema = getLLMSchema(schemaPath);
+    const rawJsonLdSchema = loadJSON<JsonLdSchema>(schemaPath);
+    const { resolved } = await resolveRefs(schema);
+    const resolvedSchema = resolved as JsonSchema;
+    const zodSchema = fixZodFromJsonSchema(resolvedSchema, convertJsonSchemaToZod(resolvedSchema));
+
+    // Setup logging
+    const {
+      log,
+      logValidationError,
+      parseZodError,
+      flushLogs,
+      logUuidGeneration,
+      logRetryAttempt,
+      logBatchOutcome,
+    } = createLogger(enableLogging);
+
+    const { encodePII, decodePII } = createPIIHandlers(enablePiiProcessing);
+
+    const rulesContext: LoadedRules | null = loadRulesConfig({
+      rulesPath,
+      schemaPath,
+      overrides: llmFieldOverrides,
+    });
+
+    const partialSchemaCache = new Map<string, { instructions: string; zodSchema: ZodTypeAny }>();
+
+    // Phase 1: File Ingestion
+    if (!quiet) {
+      console.log('\n📥 Phase 1: File Ingestion');
+    }
+
+    const ingestionManager = new FileIngestionManager(
+      db,
+      batchSize,
+      uuidColumn,
+      logUuidGeneration,
+      Boolean(forceReingestion)
+    );
+    const ingestionResults = await ingestionManager.ingestFiles(filePaths, quiet);
+
+    // Check if any file was re-ingested due to forceReingestion
+    const anyReingested = ingestionResults.some((r) => r.reingested);
+    
+    if (anyReingested) {
+      if (!quiet) {
+        console.log(
+          '⚠️  File re-ingestion detected: Invalidating all merged outputs to regenerate fresh output'
+        );
+      }
+      // Clear all written flags so everything gets written fresh
+      db.results.resetAllToUnwritten();
+      // Force fresh writer (not append) by overriding outputMode
+      outputMode = 'rewrite';
+    }
+
+    const newFiles = ingestionResults.filter((r) => !r.skipped);
+    if (!quiet && newFiles.length > 0) {
+      console.log(`✅ Ingested ${newFiles.length} new file(s)`);
+    }
+
+    const summary = ingestionManager.getIngestionSummary();
+    if (!quiet) {
+      console.log(`📊 Total: ${summary.totalRows} rows, ${summary.totalUuids} unique UUIDs`);
+    }
+
+    // Phase 2: LLM Processing
+    const unprocessedRows = db.rows.getUnprocessedRows();
+
+    if (unprocessedRows.length === 0) {
+      if (!quiet) {
+        console.log('\n✅ All rows already processed!');
+      }
+
+      // Still need to finalize output
+      const writerEarly =
+        outputMode === 'append'
+          ? createAppendingJsonLDWriter(outputPath, schemaPath)
+          : createJsonLDWriter(outputPath, schemaPath);
+
+      const streamingProcessor = new DbStreamingProcessor(writerEarly, rawJsonLdSchema, schema, db);
+      await streamingProcessor.restoreFromDatabase();
+      await streamingProcessor.finalize();
+
+      db.state.markProcessingCompleted();
+      db.close();
+      return;
+    }
+
+    if (!quiet) {
+      console.log(`\n⚙️  Phase 2: LLM Processing (${unprocessedRows.length} rows to process)`);
+    }
+
+    const writer =
+      outputMode === 'append'
+        ? createAppendingJsonLDWriter(outputPath, schemaPath)
+        : createJsonLDWriter(outputPath, schemaPath);
+
+    const streamingProcessor = new DbStreamingProcessor(writer, rawJsonLdSchema, schema, db);
+
+    // Restore any unwritten merged outputs (this will write entries with written_to_file = 0)
+    await streamingProcessor.restoreFromDatabase();
+
+    // Setup LLM client
+    let client = llmClient;
+    if (!client && unprocessedRows.length > 0) {
+      // Always create client for LLM processing
+      // (deterministic rules are determined per-batch)
+      client = LLMClientFactory.createFromEnv();
+    }
+
+    // Progress tracking
+    let processedRowCount = db.results.getTotalProcessedCount();
+    const totalRowCount = db.rows.getTotalRowCount();
+
+    let spinner: Ora = ora({ stream: process.stderr, isEnabled: !quiet });
+    let stopSpinnerUpdate: NodeJS.Timeout | null = null;
+
+    if (!quiet) {
+      spinner = ora('Processing batches...').start();
+      spinner.color = 'yellow';
+      stopSpinnerUpdate = setInterval(() => {
+        const progress = db.state.getProcessingProgress();
+        spinner.text = `Processing: ${progress.processed_rows}/${progress.total_rows} rows, ${progress.completed_uuids}/${progress.total_uuids} UUIDs completed`;
+      }, 500);
+    }
+
+    // Setup graceful shutdown
+    let hasError = false;
+    const handleShutdown = async () => {
+      if (hasError) return;
+      hasError = true;
+
+      if (stopSpinnerUpdate) {
+        clearInterval(stopSpinnerUpdate);
+      }
+
+      try {
+        await streamingProcessor.finalize();
+      } catch (error) {
+        console.error('Error finalizing during shutdown:', error);
+      }
+
+      db.close();
+
+      if (!quiet) {
+        console.log('\n⚠️  Processing interrupted. Progress saved to database.');
+        console.log('   Run again to resume from where you left off.');
+      }
+
+      process.exit(0);
+    };
+
+    process.on('SIGINT', handleShutdown);
+    process.on('SIGTERM', handleShutdown);
+
+    // Process rows in batches
+    const limit = pLimit(concurrencySize);
+    const persistLimit = pLimit(1);
+    const batchPromises: Promise<void>[] = [];
+
+    // Group unprocessed rows into batches
+    const batches: (typeof unprocessedRows)[] = [];
+    for (let i = 0; i < unprocessedRows.length; i += batchSize) {
+      batches.push(unprocessedRows.slice(i, i + batchSize));
+    }
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batchRows = batches[batchIndex];
+
+      batchPromises.push(
+        limit(async () => {
+          const csvLineStart = batchRows[0].global_row_index + 1;
+          const csvLineEnd = batchRows[batchRows.length - 1].global_row_index + 1;
+          const csvLineRange = `${csvLineStart}-${csvLineEnd}`;
+
+          try {
+            // Parse raw data for batch and restore userID from database
+            const batchData: RecordData[] = batchRows.map((row) => {
+              const data = JSON.parse(row.raw_data);
+              // Add userID back to row data (it was removed during ingestion)
+              data.userID = row.uuid;
+              return data;
+            });
+            const rowIds = batchRows.map((row) => row.row_id);
+
+            // Apply deterministic transformations if rules exist
+            let transformedBatch: RecordData[] = batchData;
+            let deterministicPrefills: DeterministicFieldResult[] | undefined = undefined;
+
+            if (rulesContext) {
+              deterministicPrefills = batchData.map((row) => transformRow(row, rulesContext));
+              // Note: p.mapped may have unknown values, but encodePII expects RecordData
+              // Cast is safe because transformRow output is compatible with RecordData structure
+              transformedBatch = deterministicPrefills.map((p) => p.mapped as RecordData);
+            }
+
+            // Encode PII
+            const { processedBatch: encodedBatch, encodingMap } = encodePII(transformedBatch);
+
+            // Log LLM input for debugging
+            log(batchIndex, encodedBatch).catch((err) => {
+              const logError = err as Error;
+              console.error(
+                `Failed to log LLM input for batch ${batchIndex} (rows ${csvLineRange}): ${logError.message}. Processing will continue.`
+              );
+            });
+
+            // Determine which schema/instructions to use
+            let currentInstructions: string;
+            let currentZodSchema: ZodTypeAny;
+
+            // Check if we need partial schema (only LLM fields)
+            if (deterministicPrefills) {
+              const pendingFields = new Set<string>();
+              for (const prefill of deterministicPrefills) {
+                for (const field of prefill.pendingFields) {
+                  pendingFields.add(field);
+                }
+              }
+
+              const fieldList = Array.from(pendingFields).sort();
+              if (fieldList.length > 0) {
+                const cacheKey = fieldList.join('|');
+                let cached = partialSchemaCache.get(cacheKey);
+
+                if (!cached) {
+                  const partialSchema = buildPartialSchema(resolvedSchema, fieldList);
+                  const partialZodSchema = fixZodFromJsonSchema(
+                    partialSchema,
+                    convertJsonSchemaToZod(partialSchema)
+                  );
+                  const inputFileName = 'data.csv';
+                  const partialInstructions = loadInstructions(
+                    INSTRUCTION_PATH,
+                    partialSchema,
+                    inputFileName
+                  );
+                  cached = { instructions: partialInstructions, zodSchema: partialZodSchema };
+                  partialSchemaCache.set(cacheKey, cached);
+                }
+
+                currentInstructions = cached.instructions;
+                currentZodSchema = cached.zodSchema;
+              } else {
+                const inputFileName = 'data.csv';
+                currentInstructions = loadInstructions(INSTRUCTION_PATH, schema, inputFileName);
+                currentZodSchema = zodSchema;
+              }
+            } else {
+              const inputFileName = 'data.csv';
+              currentInstructions = loadInstructions(INSTRUCTION_PATH, schema, inputFileName);
+              currentZodSchema = zodSchema;
+            }
+
+            // Build input for LLM
+            const input = [
+              { role: 'system' as const, content: currentInstructions },
+              { role: 'user' as const, content: JSON.stringify(encodedBatch) },
+            ];
+
+            // Process batch args
+            const batchArgs = {
+              llmClient: client,
+              instructions: currentInstructions,
+              zodSchema: currentZodSchema,
+              batchLength: batchData.length,
+              index: batchIndex,
+              input,
+              model: defaultModel,
+              logValidationError,
+              parseZodError,
+              logRetryAttempt,
+              csvLineStart: csvLineStart,
+              decodePII,
+              encodingMap,
+              requiredFieldErrorsFailBatch,
+              prefills: deterministicPrefills,
+            };
+
+            // Process batch with retry logic and timing
+            const processWithRetries = async () => {
+              const startTime = Date.now();
+              const result = await processBatch(batchArgs);
+              const processingTimeMs = Date.now() - startTime;
+
+              // Log successful batch outcome
+              await logBatchOutcome({
+                batchIndex: batchIndex,
+                csvLineRange: csvLineRange,
+                status: 'success',
+                totalAttempts: 1,
+                processingTimeMs,
+              });
+
+              return result;
+            };
+
+            const results = (await runWithRetries(
+              processWithRetries,
+              batchArgs,
+              spinner,
+              retriesNumber
+            )) as Record<string, unknown>[];
+
+            // Serialize DB/output writes to avoid race conditions across concurrent LLM batches.
+            await persistLimit(async () => {
+              await streamingProcessor.addBatchResults(results, rowIds);
+              processedRowCount += batchData.length;
+              db.state.updateLastActivity();
+            });
+          } catch (error) {
+            const batchError = error as Error;
+
+            // Log failed batch outcome
+            await logBatchOutcome({
+              batchIndex: batchIndex,
+              csvLineRange: csvLineRange,
+              status: 'failed',
+              totalAttempts: retriesNumber + 1,
+              processingTimeMs: 0,
+              finalErrorMessage: batchError.message,
+            });
+
+            console.error(
+              `❌ Batch ${batchIndex} failed (rows ${csvLineRange}): ${batchError.message}`
+            );
+            throw error;
+          }
+        })
+      );
+    }
+
+    // Wait for all batches to complete
+    await Promise.all(batchPromises);
+
+    if (stopSpinnerUpdate) {
+      clearInterval(stopSpinnerUpdate);
+    }
+
+    // Finalize
+    await streamingProcessor.finalize();
+    await flushLogs();
+
+    const finalProgress = db.state.getProcessingProgress();
+
+    if (!quiet) {
+      spinner.succeed(
+        `Analysis complete! ${finalProgress.processed_rows} rows processed, ${finalProgress.completed_uuids} UUIDs completed`
+      );
+      console.log(`📝 Output written to: ${outputPath}`);
+    }
+
+    // Mark as completed
+    db.state.markProcessingCompleted();
+  } catch (error) {
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+

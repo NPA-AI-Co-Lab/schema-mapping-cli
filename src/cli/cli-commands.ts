@@ -1,4 +1,4 @@
-import { analyzeData } from '../analysis/index.js';
+import { analyzeDataWithDb } from '../analysis/pipeline-db.js';
 import {
   bold,
   getAppParams,
@@ -7,6 +7,7 @@ import {
   removeCliSigintHandler,
   restoreCliSigintHandler,
 } from '../utils/index.js';
+import { deriveDatabasePath } from '../database/index.js';
 import { AppConfig } from '../utils/index.js';
 import { CliOptions, PackageInfo } from './cli-types.js';
 import { shouldUseInteractiveMode, validateOptions } from './cli-config.js';
@@ -44,13 +45,26 @@ export async function runAnalyzeCommand(options: CliOptions, pkg: PackageInfo) {
  * Run in interactive mode
  */
 async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
-  if (!options.quiet) {
+  // Automatically enable quiet mode when using stdout to avoid interfering with JSON output
+  const quiet = options.quiet || options.stdout || false;
+
+  if (!quiet) {
     console.error(`\n${bold(`Welcome to ${pkg.name} ${pkg.version}!`)}\n`);
   }
 
   const baseParams = options.config
     ? await getAppParamsFromConfig(options.config)
     : await getAppParams();
+
+  const includeFields = parseFieldList(options.llmFields);
+  const excludeFields = parseFieldList(options.noLlmFields);
+  const llmFieldOverrides =
+    includeFields || excludeFields
+      ? {
+          ...(includeFields ? { include: includeFields } : {}),
+          ...(excludeFields ? { exclude: excludeFields } : {}),
+        }
+      : undefined;
 
   const appParams: AppConfig = {
     ...baseParams,
@@ -67,38 +81,26 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
       options.requiredFieldsFailBatch ?? baseParams.requiredFieldErrorsFailBatch,
     uuidColumn: baseParams.uuidColumn,
     rulesPath: options.rules || baseParams.rulesPath,
+    llmFieldOverrides,
   };
 
-  const includeFields = parseFieldList(options.llmFields);
-  const excludeFields = parseFieldList(options.noLlmFields);
-  const llmOverrides =
-    includeFields || excludeFields
-      ? {
-          ...(includeFields ? { include: includeFields } : {}),
-          ...(excludeFields ? { exclude: excludeFields } : {}),
-        }
-      : undefined;
+  if (options.stdout) {
+    appParams.outputPath = '';
+
+    if (!appParams.databasePath) {
+      const baseOut = baseParams.outputPath || '';
+      if (baseOut) {
+        appParams.databasePath = deriveDatabasePath(baseOut);
+      }
+    }
+  }
 
   removeCliSigintHandler();
 
   try {
-    await analyzeData(
-      appParams.dataPath,
-      appParams.schemaPath,
-      appParams.outputPath,
-      appParams.enableLogging,
-      appParams.hidePII,
-      appParams.retriesNumber,
-      appParams.requiredFieldErrorsFailBatch,
-      undefined, // let analyzeData decide when to instantiate an LLM client (deterministic runs skip it)
-      options.quiet || false,
-      appParams.uuidColumn,
-      appParams.rulesPath,
-      llmOverrides,
-      true
-    );
+    await analyzeDataWithDb(appParams, undefined, quiet);
 
-    if (!options.quiet) {
+    if (!quiet) {
       console.error(`✅ Analysis completed! Results saved to: ${appParams.outputPath}`);
     }
   } catch (error) {
@@ -111,7 +113,10 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
  * Run in CLI mode
  */
 async function runCliMode(options: CliOptions, pkg: PackageInfo) {
-  if (!options.quiet) {
+  // Automatically enable quiet mode when using stdout to avoid interfering with JSON output
+  const quiet = options.quiet || options.stdout || false;
+
+  if (!quiet) {
     console.error(`\n${bold(`Welcome to ${pkg.name} ${pkg.version}!`)}\n`);
   }
 
@@ -120,11 +125,22 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
   // Get base config and apply CLI overrides
   const baseConfig = options.config ? loadAppConfig(options.config) : loadAppConfig();
 
+  const includeFields = parseFieldList(options.llmFields);
+  const excludeFields = parseFieldList(options.noLlmFields);
+  const llmFieldOverrides =
+    includeFields || excludeFields
+      ? {
+          ...(includeFields ? { include: includeFields } : {}),
+          ...(excludeFields ? { exclude: excludeFields } : {}),
+        }
+      : undefined;
+
   const appParams: AppConfig = {
     ...baseConfig,
-    dataPath: options.input || baseConfig.dataPath,
+    dataPaths: options.input ? [options.input] : baseConfig.dataPaths,
     schemaPath: options.schema || baseConfig.schemaPath,
     outputPath: options.output || baseConfig.outputPath,
+    databasePath: baseConfig.databasePath,
     enableLogging: options.logging ?? baseConfig.enableLogging,
     hidePII: options.hidePii ?? baseConfig.hidePII,
     retriesNumber: options.retries ? parseInt(options.retries, 10) : baseConfig.retriesNumber,
@@ -138,22 +154,26 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     fallbackModel: options.fallbackModel || baseConfig.fallbackModel,
     uuidColumn: baseConfig.uuidColumn,
     rulesPath: options.rules || baseConfig.rulesPath,
+    llmFieldOverrides,
+    resumeMode: baseConfig.resumeMode,
   };
 
-  const includeFields = parseFieldList(options.llmFields);
-  const excludeFields = parseFieldList(options.noLlmFields);
-  const llmOverrides =
-    includeFields || excludeFields
-      ? {
-          ...(includeFields ? { include: includeFields } : {}),
-          ...(excludeFields ? { exclude: excludeFields } : {}),
-        }
-      : undefined;
+  // If stdout mode requested, ensure outputPath signals stdout and set a database path
+  if (options.stdout) {
+    appParams.outputPath = '';
+
+    if (!appParams.databasePath) {
+      const baseOut = baseConfig.outputPath || '';
+      if (baseOut) {
+        appParams.databasePath = deriveDatabasePath(baseOut);
+      }
+    }
+  }
 
   // Determine output mode: stdout vs file
   const outputToFile = !options.stdout && !!(options.output || baseConfig.outputPath);
 
-  if (!options.quiet) {
+  if (!quiet) {
     console.error(`- Output: ${outputToFile ? appParams.outputPath : 'stdout'}`);
     console.error(`- Logging: ${appParams.enableLogging ? 'enabled' : 'disabled'}`);
     console.error(`- PII protection: ${appParams.hidePII ? 'enabled' : 'disabled'}`);
@@ -163,22 +183,9 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
   removeCliSigintHandler();
 
   try {
-    await analyzeData(
-      appParams.dataPath,
-      appParams.schemaPath,
-      outputToFile ? appParams.outputPath : '',
-      appParams.enableLogging,
-      appParams.hidePII,
-      appParams.retriesNumber,
-      appParams.requiredFieldErrorsFailBatch,
-      undefined, // let analyzeData decide when to instantiate an LLM client (deterministic runs skip it)
-      options.quiet || false,
-      appParams.uuidColumn,
-      appParams.rulesPath,
-      llmOverrides
-    );
+    await analyzeDataWithDb(appParams, undefined, quiet);
 
-    if (!options.quiet && outputToFile) {
+    if (!quiet && outputToFile) {
       console.error(`✅ Analysis completed! Results saved to: ${appParams.outputPath}`);
     }
   } catch (error) {

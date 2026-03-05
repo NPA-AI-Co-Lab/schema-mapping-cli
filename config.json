@@ -1,7 +1,10 @@
 {
-  "dataPath": "./examples/sample_comments.csv",
+  "dataPaths": [
+    "./examples/sample_comments.csv"
+  ],
   "schemaPath": "./examples/schema.jsonld",
-  "outputPath": "./analysis_results.jsonld",
+  "outputPath": "./output.jsonld",
+  "databasePath": "./multi-file-output.db",
   "enableLogging": true,
   "hidePII": true,
   "retriesNumber": 2,
@@ -11,5 +14,7 @@
   "defaultModel": "gpt-4.1-mini",
   "fallbackModel": "gpt-4.1",
   "uuidColumn": "primaryEmail",
-  "rulesPath": "./config/sample_comments.rules.json"
+  "rulesPath": "./config/sample_comments.rules.json",
+  "resumeMode": "auto",
+  "forceReingestion": false
 }

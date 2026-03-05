@@ -41,7 +41,8 @@ export function loadInstructions(
  */
 export async function* loadData(
   filePath: string,
-  batchSize: number
+  batchSize: number,
+  checkHeaderDuplicates: boolean = false
 ): AsyncGenerator<Record<string, string>[]> {
   let batch: Record<string, string>[] = [];
   let headerColumns: string[] = [];
@@ -49,7 +50,21 @@ export async function* loadData(
   const stream = createReadStream(filePath).pipe(csv());
 
   stream.on('headers', (headers: string[]) => {
-    headerColumns = headers as string[];
+    const seen = new Set<string>();
+    const duplicates: string[] = [];
+    headerColumns = headers.filter((h) => {
+      if (seen.has(h)) {
+        duplicates.push(h);
+        return false;
+      }
+      seen.add(h);
+      return true;
+    });
+    if (duplicates.length > 0 && checkHeaderDuplicates) {
+      console.warn(
+        `⚠️  Warning: Duplicate column names detected in CSV header: ${duplicates.join(', ')}. Only the last occurrence of each will be used.`
+      );
+    }
   });
 
   for await (const row of stream) {
@@ -58,7 +73,7 @@ export async function* loadData(
       continue;
     }
     // Check for row validity
-    if (headerColumns.length > 0) {
+    if (headerColumns.length > 0 && checkHeaderDuplicates) {
       const rowKeys = Object.keys(row);
       if (rowKeys.length !== headerColumns.length) {
         throw new Error(

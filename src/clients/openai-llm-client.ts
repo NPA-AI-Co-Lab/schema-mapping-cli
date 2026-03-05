@@ -20,7 +20,7 @@ export class OpenAILLMClient implements ILLMClient {
       throw new Error('OpenAI API key is required');
     }
 
-    this.client = new OpenAI({ apiKey, timeout: 60_000 });
+    this.client = new OpenAI({ apiKey, timeout: 150_000 });
     this.defaultModel = defaultModel;
     this.fallbackModel = fallbackModel;
   }
