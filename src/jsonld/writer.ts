@@ -79,8 +79,9 @@ export function createAppendingJsonLDWriter(
         try {
           // Read existing file to check if it has content
           const existingContent = await fs.readFile(outputPath, 'utf-8');
-          const hasExistingContent =
-            existingContent.trim().length > 0 && existingContent.trim() !== '[]';
+          const trimmedContent = existingContent.trim();
+          const isEmptyArray = /^\[\s*\]$/.test(trimmedContent);
+          const hasExistingContent = trimmedContent.length > 0 && !isEmptyArray;
 
           // Prepare new entries
           const newEntries = results.map((result) => {
@@ -90,7 +91,7 @@ export function createAppendingJsonLDWriter(
 
           if (hasExistingContent) {
             // Remove closing bracket, add comma and new entries, then close
-            const contentWithoutClosing = existingContent.replace(/\n\]\s*$/, '');
+            const contentWithoutClosing = existingContent.replace(/\s*\]\s*$/, '');
             const updatedContent = contentWithoutClosing + ',\n' + newEntries.join(',\n') + '\n]';
             await fs.writeFile(outputPath, updatedContent);
           } else {
