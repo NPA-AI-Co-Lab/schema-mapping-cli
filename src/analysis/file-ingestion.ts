@@ -103,8 +103,6 @@ export class FileIngestionManager {
         for (const record of batchWithUuids) {
           const rawData = { ...record };
           delete rawData.userID;
-          const signature = JSON.stringify(rawData);
-          const hash = h64(signature, 0xabcd).toString(16); // Hash raw data for deduplication
           const uuid = record.userID as string;
 
           if (!uuid) {
@@ -112,6 +110,12 @@ export class FileIngestionManager {
             csvRowIndex++;
             continue;
           }
+
+          const signature = JSON.stringify(rawData);
+          // Include UUID in hash key so rows with different identities are not collapsed
+          // when input only contains the UUID column.
+          const dedupeKey = JSON.stringify({ uuid, rawData });
+          const hash = h64(dedupeKey, 0xabcd).toString(16);
 
           if (!sourceByUuid.has(uuid)) {
             sourceByUuid.set(uuid, this.findSourceValue(record, this.uuidColumn));
