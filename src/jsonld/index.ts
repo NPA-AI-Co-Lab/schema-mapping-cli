@@ -8,7 +8,24 @@ export type {
 } from './types.js';
 
 // Export taxonomy functions
-export { getTaxonomy, handleTaxonomyEnum, clearTaxonomyCache } from './taxonomy.js';
+export {
+  getTaxonomy,
+  handleTaxonomyEnum,
+  clearTaxonomyCache,
+  resolveTaxonomiesDir,
+  configureTaxonomies,
+  getTaxonomyResolution,
+  resetTaxonomyResolution,
+  describeTaxonomySource,
+  TaxonomyResolutionError,
+  ADC_SCHEMA_PACKAGE,
+} from './taxonomy.js';
+export type {
+  TaxonomySource,
+  TaxonomyCandidate,
+  TaxonomyResolution,
+  TaxonomyResolverOptions,
+} from './taxonomy.js';
 
 // Export schema conversion functions
 export {

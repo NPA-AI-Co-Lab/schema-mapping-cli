@@ -1,4 +1,4 @@
-import { validateJSONPath } from '../utils/index.js';
+import { validateJSONPath, validateDirectoryPath } from '../utils/index.js';
 import { CliOptions } from './cli-types.js';
 
 /**
@@ -37,6 +37,13 @@ export function validateOptions(options: CliOptions): void {
 
   if (options.rules && !validateJSONPath(options.rules)) {
     errors.push(`Rules file does not exist: ${options.rules}`);
+  }
+
+  if (options.taxonomies) {
+    const taxonomiesCheck = validateDirectoryPath(options.taxonomies);
+    if (taxonomiesCheck !== true) {
+      errors.push(`Taxonomies directory (--taxonomies) error: ${taxonomiesCheck}`);
+    }
   }
 
   if (options.batchSize) {

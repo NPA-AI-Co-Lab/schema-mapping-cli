@@ -31,7 +31,7 @@ Keep dependencies up to date with your Node version. If you add new packages, in
 - Follow existing naming patterns (`camelCase` for functions, `PascalCase` for types). Export the minimum surface needed.
 - Prefer small, composable functions. If a function grows larger than ~50 lines, consider splitting it up.
 - When touching LLM-related logic (`src/clients` or `src/analysis`), isolate provider-specific behavior behind interfaces in `src/interfaces/` so new providers can plug in easily.
-- Ensure new schema or configuration samples live in `examples/`, and keep them in sync with changes in default behavior.
+- Configuration samples live in `config/` (rules, presets) and sample data in `examples/`; keep them in sync with changes in default behavior. The ADC schema and taxonomies are **not** edited here — they are maintained in [NPA-AI-Co-Lab/adc-schema](https://github.com/NPA-AI-Co-Lab/adc-schema) and consumed through the `@npa-ai-co-lab/adc-schema` dependency. After bumping that dependency run `npm run vendor:sync` and commit the refreshed `vendor/taxonomies/`.
 
 ## Validation Checklist
 Before opening a pull request, please run through the following:

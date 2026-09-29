@@ -1,6 +1,6 @@
 {
   "name": "npa-ingest-insight-cli",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "main": "cli.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,9 @@
     "format": "prettier --write \"src/**/*.{ts,js,json}\" \"tests/**/*.{ts,js,json}\" \"*.{ts,js,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\" \"tests/**/*.{ts,js,json}\" \"*.{ts,js,json}\"",
     "test": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "vendor:sync": "node scripts/sync-vendor-taxonomies.mjs",
+    "vendor:check": "node scripts/sync-vendor-taxonomies.mjs --check"
   },
   "bin": {
     "npa-insight": "./dist/cli.js"
@@ -18,7 +20,7 @@
   "files": [
     "dist",
     "static",
-    "taxonomies",
+    "vendor",
     "config",
     "examples",
     "output/.gitkeep",
@@ -33,6 +35,7 @@
   "description": "CLI application to structure and tag data",
   "dependencies": {
     "@coffeeandfun/remove-pii": "^2.0.0",
+    "@npa-ai-co-lab/adc-schema": "^1.0.0",
     "better-sqlite3": "^12.6.2",
     "commander": "^14.0.0",
     "csv-parser": "^3.2.0",

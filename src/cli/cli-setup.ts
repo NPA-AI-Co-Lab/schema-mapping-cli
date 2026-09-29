@@ -20,6 +20,10 @@ export function setupCliProgram(program: Command, pkg: PackageInfo) {
     .option('-o, --output <file>', 'Output file path (optional, use stdout if not specified)')
     .option('-c, --config <file>', 'Configuration file path (defaults override config file)')
     .option('--rules <file>', 'Deterministic rules configuration file path')
+    .option(
+      '--taxonomies <dir>',
+      'Directory with ADC taxonomy files; overrides the installed @npa-ai-co-lab/adc-schema package and the vendored fallback'
+    )
     .option('--batch-size <number>', 'Number of records per batch (1-50)')
     .option('--concurrency <number>', 'Number of concurrent requests (1-20)')
     .option('--retries <number>', 'Number of retry attempts (0-10)')
@@ -58,6 +62,9 @@ Examples:
 
   # Delegate specific fields to the LLM
   ${pkg.name} analyze --rules ./config/sample_comments.rules.json --llm-fields object.responses
+
+  # Use a local copy of the ADC taxonomies instead of the installed adc-schema package
+  ${pkg.name} analyze -c config.json --taxonomies ./my-taxonomies
 
   # CLI-only (no config file)
   ${pkg.name} analyze -i data.csv -s schema.jsonld -o results.jsonld

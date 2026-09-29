@@ -55,6 +55,7 @@ export {
   validateOutputFile,
   validateCSVPath,
   validateJSONPath,
+  validateDirectoryPath,
   splitValues,
   checkNotEmpty,
   checkPropertyExists,

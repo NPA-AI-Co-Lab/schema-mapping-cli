@@ -40,14 +40,21 @@ export async function getAppParamsFromConfig(configPath: string): Promise<AppCon
   }
 
   // Validate all provided data paths, schema and output at once
-  if (!validateConfigPaths(filePaths, fullConfig.schemaPath, outputPath)) {
+  if (
+    !validateConfigPaths(filePaths, fullConfig.schemaPath, outputPath, fullConfig.taxonomiesPath)
+  ) {
     process.exit(1);
   }
   showOptionsSummary(
     outputPath,
     fullConfig.enableLogging,
     fullConfig.hidePII,
-    fullConfig.retriesNumber
+    fullConfig.retriesNumber,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    fullConfig.taxonomiesPath
   );
 
   const appConfig: AppConfig = {
@@ -65,6 +72,7 @@ export async function getAppParamsFromConfig(configPath: string): Promise<AppCon
     fallbackModel: fullConfig.fallbackModel ?? 'gpt-4.1',
     uuidColumn: fullConfig.uuidColumn,
     rulesPath: fullConfig.rulesPath,
+    taxonomiesPath: fullConfig.taxonomiesPath,
     resumeMode: fullConfig.resumeMode ?? 'auto',
     forceReingestion: fullConfig.forceReingestion ?? false,
   };
@@ -100,7 +108,12 @@ export async function getAppParams(): Promise<AppConfig> {
     outputPath,
     fullConfig.enableLogging,
     fullConfig.hidePII,
-    fullConfig.retriesNumber
+    fullConfig.retriesNumber,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    fullConfig.taxonomiesPath
   );
 
   // Get data paths (array or single path)
@@ -111,7 +124,9 @@ export async function getAppParams(): Promise<AppConfig> {
   }
 
   // Validate all provided data paths, schema and output at once
-  if (!validateConfigPaths(filePaths, fullConfig.schemaPath, outputPath)) {
+  if (
+    !validateConfigPaths(filePaths, fullConfig.schemaPath, outputPath, fullConfig.taxonomiesPath)
+  ) {
     process.exit(1);
   }
   const appConfig: AppConfig = {
@@ -129,6 +144,7 @@ export async function getAppParams(): Promise<AppConfig> {
     fallbackModel: fullConfig.fallbackModel ?? 'gpt-4.1',
     uuidColumn: fullConfig.uuidColumn,
     rulesPath: fullConfig.rulesPath,
+    taxonomiesPath: fullConfig.taxonomiesPath,
     resumeMode: fullConfig.resumeMode ?? 'auto',
     forceReingestion: fullConfig.forceReingestion ?? false,
   };

@@ -6,14 +6,15 @@ import type { AppConfig } from '../src/utils/types.js';
 
 /**
  * Guards the real preset file that hackathon teams will point the CLI at. It must load,
- * normalize and pass validateConfig on a fresh clone (all referenced paths exist in git,
- * including output/.gitkeep), and must keep the choices that make it safe on a new /
- * low-tier OpenAI account.
+ * normalize and pass validateConfig on a fresh clone after `npm install` (all referenced
+ * paths exist: output/.gitkeep is in git, the schema comes from the installed
+ * @npa-ai-co-lab/adc-schema package), and must keep the choices that make it safe on a
+ * new / low-tier OpenAI account.
  */
 describe('config/hackathon.config.json', () => {
   const presetPath = path.resolve(process.cwd(), 'config/hackathon.config.json');
 
-  it('normalizes and validates on a fresh clone', () => {
+  it('normalizes and validates on a fresh clone after npm install', () => {
     const preset = JSON.parse(fs.readFileSync(presetPath, 'utf8')) as AppConfig & {
       _comment?: string;
     };

@@ -81,6 +81,7 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
       options.requiredFieldsFailBatch ?? baseParams.requiredFieldErrorsFailBatch,
     uuidColumn: baseParams.uuidColumn,
     rulesPath: options.rules || baseParams.rulesPath,
+    taxonomiesPath: options.taxonomies || baseParams.taxonomiesPath,
     llmFieldOverrides,
     rateLimitMaxRetries: options.rateLimitRetries
       ? parseInt(options.rateLimitRetries, 10)
@@ -180,6 +181,7 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     fallbackModel: options.fallbackModel || baseConfig.fallbackModel,
     uuidColumn: baseConfig.uuidColumn,
     rulesPath: options.rules || baseConfig.rulesPath,
+    taxonomiesPath: options.taxonomies || baseConfig.taxonomiesPath,
     llmFieldOverrides,
     resumeMode: baseConfig.resumeMode,
     rateLimitMaxRetries: options.rateLimitRetries

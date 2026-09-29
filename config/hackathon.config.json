@@ -1,7 +1,7 @@
 {
   "_comment": "Preset for new/low-tier OpenAI accounts (hackathon). Low concurrency, patient rate-limit handling, no escalation to a bigger model. Replace dataPaths with your CSV(s).",
   "dataPaths": ["./examples/sample_comments.csv"],
-  "schemaPath": "./examples/schema.jsonld",
+  "schemaPath": "./node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld",
   "rulesPath": "./config/sample_comments.rules.json",
   "outputPath": "./output/hackathon.jsonld",
   "enableLogging": true,

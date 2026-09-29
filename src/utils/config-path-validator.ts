@@ -1,4 +1,9 @@
-import { validateOutputFile, validateCSVPath, validateJSONPath } from './validation.js';
+import {
+  validateOutputFile,
+  validateCSVPath,
+  validateJSONPath,
+  validateDirectoryPath,
+} from './validation.js';
 
 /**
  * Validate all configuration paths
@@ -6,7 +11,8 @@ import { validateOutputFile, validateCSVPath, validateJSONPath } from './validat
 export function validateConfigPaths(
   dataPaths: string[],
   schemaPath: string,
-  outputPath: string
+  outputPath: string,
+  taxonomiesPath?: string
 ): boolean {
   const errors: string[] = [];
 
@@ -25,6 +31,13 @@ export function validateConfigPaths(
   const outputCheck = validateOutputFile(outputPath);
   if (outputCheck !== true) {
     errors.push(`Output file error: ${outputCheck}`);
+  }
+
+  if (taxonomiesPath) {
+    const taxonomiesCheck = validateDirectoryPath(taxonomiesPath);
+    if (taxonomiesCheck !== true) {
+      errors.push(`Taxonomies directory (taxonomiesPath) error: ${taxonomiesCheck}`);
+    }
   }
 
   if (errors.length > 0) {

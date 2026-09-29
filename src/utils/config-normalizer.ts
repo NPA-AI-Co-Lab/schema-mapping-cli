@@ -121,6 +121,15 @@ export function validateConfig(config: AppConfig): void {
     errors.push(`Rules file not found: ${config.rulesPath}`);
   }
 
+  // Validate taxonomies directory if specified (an explicit path is never silently ignored)
+  if (config.taxonomiesPath) {
+    if (!existsSync(config.taxonomiesPath)) {
+      errors.push(`Taxonomies directory not found: ${config.taxonomiesPath}`);
+    } else if (!fs.statSync(config.taxonomiesPath).isDirectory()) {
+      errors.push(`taxonomiesPath must point to a directory: ${config.taxonomiesPath}`);
+    }
+  }
+
   // Validate resume mode
   if (config.resumeMode && !['auto', 'fresh', 'resume'].includes(config.resumeMode)) {
     errors.push('resumeMode must be one of: auto, fresh, resume');
@@ -192,6 +201,8 @@ export function createConfigHash(config: AppConfig): string {
     rulesPath: config.rulesPath || '',
     hidePII: config.hidePII,
     requiredFieldErrorsFailBatch: config.requiredFieldErrorsFailBatch,
+    // Only when set, so hashes of configs without an explicit taxonomy path stay unchanged
+    ...(config.taxonomiesPath ? { taxonomiesPath: config.taxonomiesPath } : {}),
   };
 
   const configString = JSON.stringify(relevantConfig, Object.keys(relevantConfig).sort());

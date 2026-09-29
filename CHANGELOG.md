@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.3.0] - 2026-09-24
+
+The Audience Data Commons data model moves out of this repository into its own standard,
+[NPA-AI-Co-Lab/adc-schema](https://github.com/NPA-AI-Co-Lab/adc-schema), published as
+`@npa-ai-co-lab/adc-schema`. The CLI becomes a consumer of that package. No change to the
+content of the data model.
+
+### Added
+
+- Dependency on `@npa-ai-co-lab/adc-schema` (^1.0.0); `npm install` brings the schema and the eight taxonomies into `node_modules/`
+- Taxonomy resolver (`src/jsonld/taxonomy.ts`): the taxonomy directory is looked up in order — explicit path → installed `@npa-ai-co-lab/adc-schema` package → vendored fallback `vendor/taxonomies/`. An explicit path that does not exist is a configuration error and is never silently replaced; when nothing resolves, the error lists every location tried and why it was skipped
+- Configuration option `taxonomiesPath` and CLI flag `--taxonomies <dir>` (validated as an existing directory; the flag overrides the config key)
+- Run summary line `📚 Taxonomies: explicit|package|vendor (<dir>)` stating which source was actually used; the same is recorded in the output metadata entry (`taxonomiesSource`, `taxonomiesPath`)
+- `vendor/taxonomies/` — pinned copy of the taxonomies from `@npa-ai-co-lab/adc-schema` for offline and air-gapped installs, marked read-only in `vendor/README.md`; `npm run vendor:check` (also a test) verifies it matches the installed package, `npm run vendor:sync` refreshes it after a dependency bump
+- Tests: `tests/taxonomy-resolver.test.ts` (15) and `tests/taxonomies-config.test.ts` (11) — precedence, error listing, config/CLI surface, end-to-end rules-only run with an explicit directory, vendor parity. Suite grows from 207 to 233
+
+### Changed
+
+- Default `schemaPath` in `config.json`, `config/hackathon.config.json` and the `schema` reference in `config/sample_comments.rules.json` now point at the schema inside the installed package (`node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld`) instead of `examples/schema.jsonld`
+- `files` whitelist ships `vendor/` instead of `taxonomies/`
+- `createConfigHash` includes `taxonomiesPath` only when it is set, so hashes of existing configs (and resume detection on existing databases) are unchanged
+- A missing individual taxonomy file still yields an empty enum with a warning; the warning now names the taxonomy source in use
+- README: new section "ADC schema and taxonomies"; `schemaPath`, `taxonomiesPath` and `--taxonomies` documented; project structure updated
+
+### Removed
+
+- `examples/schema.jsonld` and `taxonomies/*.json` — the data model is no longer hosted in this repository. The only taxonomy data left in the tree is the vendored fallback
+
 ## [2.2.0] - 2026-09-11
 
 ### Fixed

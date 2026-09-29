@@ -1,8 +1,6 @@
 {
-  "dataPaths": [
-    "./examples/sample_comments.csv"
-  ],
-  "schemaPath": "./examples/schema.jsonld",
+  "dataPaths": ["./examples/sample_comments.csv"],
+  "schemaPath": "./node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld",
   "outputPath": "./output.jsonld",
   "databasePath": "./multi-file-output.db",
   "enableLogging": true,

@@ -1,5 +1,5 @@
 {
-  "schema": "../examples/schema.jsonld",
+  "schema": "../node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld",
   "llm": {
     "default": false,
     "fields": [
@@ -141,11 +141,7 @@
     },
     "action.timeSpent": {
       "source": "action_timeSpent",
-      "transforms": [
-        "trim",
-        { "type": "toNumber" },
-        { "type": "secondsToDuration" }
-      ]
+      "transforms": ["trim", { "type": "toNumber" }, { "type": "secondsToDuration" }]
     },
     "action.completionRate": {
       "source": "action_completionRate",

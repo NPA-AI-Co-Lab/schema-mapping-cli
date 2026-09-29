@@ -1,4 +1,5 @@
 import path from 'path';
+import { realpathSync } from 'fs';
 import { loadJSON } from '../../utils/index.js';
 import { JsonLdSchema } from '../../jsonld/types.js';
 import { extractSchemaFields } from './schema-fields.js';
@@ -149,6 +150,19 @@ export interface LoadRulesArgs {
   overrides?: LlmFieldOverrides;
 }
 
+/**
+ * Resolves symlinks (e.g. a `file:`-linked or `npm link`ed adc-schema package) so two paths
+ * pointing at the same physical file compare equal. Falls back to the plain resolved path
+ * when the file doesn't exist yet or can't be read.
+ */
+function realOrResolvedPath(resolvedPath: string): string {
+  try {
+    return realpathSync(resolvedPath);
+  } catch {
+    return resolvedPath;
+  }
+}
+
 export function loadRulesConfig({
   rulesPath,
   schemaPath,
@@ -164,7 +178,9 @@ export function loadRulesConfig({
   const resolvedSchemaFromConfig = path.resolve(path.dirname(resolvedRulesPath), config.schema);
   const resolvedSchemaPath = path.resolve(schemaPath);
 
-  if (resolvedSchemaFromConfig !== resolvedSchemaPath) {
+  if (
+    realOrResolvedPath(resolvedSchemaFromConfig) !== realOrResolvedPath(resolvedSchemaPath)
+  ) {
     console.warn(
       `⚠️ Rules schema mismatch. Expected ${resolvedSchemaPath} but rules file references ${resolvedSchemaFromConfig}`
     );

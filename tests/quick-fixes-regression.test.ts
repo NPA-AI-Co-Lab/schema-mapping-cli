@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { createRequire } from 'module';
 import { LLMClientFactory } from '../src/clients/llm-client-factory.js';
 import { LLMRequestError } from '../src/clients/llm-errors.js';
 import { analyzeDataWithDb } from '../src/analysis/pipeline-db.js';
@@ -11,6 +12,9 @@ import type {
   LLMAnalysisRequest,
   LLMAnalysisResponse,
 } from '../src/interfaces/llm-client.interface.js';
+
+// The ADC schema now ships in the @npa-ai-co-lab/adc-schema package (no longer in examples/).
+const ADC_SCHEMA_PATH = createRequire(import.meta.url).resolve('@npa-ai-co-lab/adc-schema');
 
 describe('qf-1/qf-2 regression tests', () => {
   let tempDir: string;
@@ -57,7 +61,7 @@ describe('qf-1/qf-2 regression tests', () => {
     const outputPath = path.join(tempDir, 'output.jsonld');
     const config: AppConfig = {
       dataPaths: ['./examples/sample_comments.csv'],
-      schemaPath: './examples/schema.jsonld',
+      schemaPath: ADC_SCHEMA_PATH,
       rulesPath,
       outputPath,
       enableLogging: false,
@@ -93,7 +97,7 @@ describe('qf-1/qf-2 regression tests', () => {
     const outputPath = path.join(tempDir, 'output.jsonld');
     const config: AppConfig = {
       dataPaths: ['./examples/sample_comments.csv'],
-      schemaPath: './examples/schema.jsonld',
+      schemaPath: ADC_SCHEMA_PATH,
       rulesPath: './config/sample_comments.rules.json', // Has LLM fields
       outputPath,
       enableLogging: false,
@@ -123,7 +127,7 @@ describe('qf-1/qf-2 regression tests', () => {
     const outputPath = path.join(tempDir, 'output.jsonld');
     const config: AppConfig = {
       dataPaths: ['./examples/sample_comments.csv'],
-      schemaPath: './examples/schema.jsonld',
+      schemaPath: ADC_SCHEMA_PATH,
       rulesPath: './config/sample_comments.rules.json', // Has LLM fields
       outputPath,
       enableLogging: false,
@@ -181,7 +185,7 @@ describe('qf-1/qf-2 regression tests', () => {
     const client = new UnauthorizedClient();
     const config: AppConfig = {
       dataPaths: ['./examples/sample_comments.csv'],
-      schemaPath: './examples/schema.jsonld',
+      schemaPath: ADC_SCHEMA_PATH,
       rulesPath: './config/sample_comments.rules.json',
       outputPath: path.join(tempDir, 'output.jsonld'),
       enableLogging: false,
@@ -215,6 +219,10 @@ describe('qf-1/qf-2 regression tests', () => {
         return 'test-fallback';
       }
 
+      isConfigured(): boolean {
+        return true;
+      }
+
       async analyze(_request: LLMAnalysisRequest): Promise<LLMAnalysisResponse> {
         const error = new Error('Permanent API failure (non-retryable)');
         (error as any).isRetryable = false;
@@ -227,7 +235,7 @@ describe('qf-1/qf-2 regression tests', () => {
     const outputPath = path.join(tempDir, 'output.jsonld');
     const config: AppConfig = {
       dataPaths: ['./examples/sample_comments.csv'],
-      schemaPath: './examples/schema.jsonld',
+      schemaPath: ADC_SCHEMA_PATH,
       rulesPath: './config/sample_comments.rules.json',
       outputPath,
       enableLogging: false,

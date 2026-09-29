@@ -28,6 +28,7 @@ import {
   createAppendingJsonLDWriter,
   createJsonLDWriter,
   getLLMSchema,
+  configureTaxonomies,
   JsonLdSchema,
 } from '../jsonld/index.js';
 import { createLogger } from '../logging.js';
@@ -47,6 +48,7 @@ import { RateLimitGate } from '../utils/rate-limit-gate.js';
 import { adjustConcurrency as applyAdaptiveConcurrency } from '../utils/adaptive-concurrency.js';
 import { ThrottledLLMClient } from '../clients/throttled-llm-client.js';
 import type { ValidationErrorDetails } from '../jsonld/types.js';
+import type { TaxonomyResolution } from '../jsonld/taxonomy.js';
 
 type JsonSchema = Record<string, unknown>;
 type DbMode = 'fresh' | 'resume';
@@ -67,6 +69,8 @@ const PROVENANCE_CONTEXT = {
   fallbackModel: 'urn:npa-ingest-insight-cli:fallbackModel',
   schemaPath: 'urn:npa-ingest-insight-cli:schemaPath',
   rulesPath: 'urn:npa-ingest-insight-cli:rulesPath',
+  taxonomiesSource: 'urn:npa-ingest-insight-cli:taxonomiesSource',
+  taxonomiesPath: 'urn:npa-ingest-insight-cli:taxonomiesPath',
   uuidColumn: 'urn:npa-ingest-insight-cli:uuidColumn',
   sourceFiles: 'urn:npa-ingest-insight-cli:sourceFiles',
   outputPath: 'urn:npa-ingest-insight-cli:outputPath',
@@ -109,7 +113,8 @@ function buildOutputProvenanceEntry(
   normalizedConfig: AppConfig,
   filePaths: string[],
   configHash: string,
-  dbPath: string
+  dbPath: string,
+  taxonomies: TaxonomyResolution
 ): Record<string, unknown> {
   const packageManifest = loadJSON<PackageManifest>(path.resolve(basePath, 'package.json'));
   const toolName = packageManifest.name || 'npa-ingest-insight-cli';
@@ -132,6 +137,8 @@ function buildOutputProvenanceEntry(
     fallbackModel: normalizedConfig.fallbackModel,
     schemaPath: normalizedConfig.schemaPath,
     rulesPath: normalizedConfig.rulesPath || null,
+    taxonomiesSource: taxonomies.source,
+    taxonomiesPath: taxonomies.dir,
     uuidColumn: normalizedConfig.uuidColumn || null,
     sourceFiles: filePaths,
     outputPath: normalizedConfig.outputPath || 'stdout',
@@ -187,8 +194,13 @@ export async function analyzeDataWithDb(
   const filePaths = getFilePaths(normalizedConfig);
   const dbPath = databasePath || deriveDatabasePath(outputPath);
 
+  // Pick the taxonomy directory for this run: explicit path → installed adc-schema package →
+  // vendored fallback. Fails here, before any work is done, listing every location tried.
+  const taxonomies = configureTaxonomies(normalizedConfig.taxonomiesPath);
+
   if (!quiet) {
     console.log(`\n🗄️  Database: ${dbPath}`);
+    console.log(`📚 Taxonomies: ${taxonomies.source} (${taxonomies.dir})`);
     console.log(`📁 Processing ${filePaths.length} file(s)`);
     for (const fp of filePaths) {
       console.log(`   - ${path.basename(fp)}`);
@@ -302,7 +314,8 @@ export async function analyzeDataWithDb(
       normalizedConfig,
       filePaths,
       currentConfigHash,
-      dbPath
+      dbPath,
+      taxonomies
     );
     const { resolved } = await resolveRefs(schema);
     const resolvedSchema = resolved as JsonSchema;

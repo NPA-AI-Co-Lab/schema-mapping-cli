@@ -50,6 +50,24 @@ export function validateCSVPath(value: string): true | string {
 /**
  * Validate JSON file path
  */
+export function validateDirectoryPath(value: string): true | string {
+  const resolvedPath = path.resolve(value);
+
+  try {
+    const stats = statSync(resolvedPath);
+    if (!stats.isDirectory()) {
+      return `Path must point to a directory: ${resolvedPath}`;
+    }
+  } catch {
+    return `Directory does not exist: ${resolvedPath}`;
+  }
+
+  return true;
+}
+
+/**
+ * Validate that a path points to an existing JSON or JSON-LD file
+ */
 export function validateJSONPath(value: string): true | string {
   const resolvedPath = path.resolve(value);
 

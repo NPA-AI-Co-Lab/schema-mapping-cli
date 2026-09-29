@@ -45,7 +45,7 @@ git clone https://github.com/<REPO_NAME>/npa-ingest-insight-cli.git
 cd npa-ingest-insight-cli
 ```
 
-2. Install dependencies:
+2. Install dependencies (this also installs `@npa-ai-co-lab/adc-schema`, the package that carries the ADC schema and taxonomies — see [ADC schema and taxonomies](#adc-schema-and-taxonomies)):
 
 ```bash
 npm install
@@ -87,7 +87,7 @@ Create a configuration file (`config.json`) with your data and schema paths:
 ```json
 {
   "dataPath": "./examples/sample_comments.csv",
-  "schemaPath": "./examples/schema.jsonld",
+  "schemaPath": "./node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld",
   "outputPath": "./output/analysis_results.jsonld",
   "enableLogging": true,
   "hidePII": true,
@@ -111,7 +111,8 @@ Create a configuration file (`config.json`) with your data and schema paths:
 
 - **dataPath** specifies the path to the input CSV file (legacy, single-file mode);
 - **dataPaths** specifies an array of input CSV file paths (multi-file mode) - see [Multi-File Processing](#multi-file-processing) below;
-- **schemaPath** specifies the path to schema that the output will be based on;
+- **schemaPath** specifies the path to the JSON-LD schema that the output will be based on. The ADC schema ships in the `@npa-ai-co-lab/adc-schema` package: in a checkout of this repository it is at `./node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld` (the path used by the sample configs); with a globally installed CLI, download `adc.schema.jsonld` from the [adc-schema releases](https://github.com/NPA-AI-Co-Lab/adc-schema/releases) and point `schemaPath` at your copy;
+- **taxonomiesPath** (optional) specifies a directory with the ADC taxonomy files (`ActionType-v1.json`, `Gender-v1.json`, …). Leave it out to use the taxonomies from the installed `@npa-ai-co-lab/adc-schema` package (or the vendored fallback); set it only to run against a different or local copy — see [ADC schema and taxonomies](#adc-schema-and-taxonomies);
 - **outputPath** specifies the path where results will be saved. Required when using `--config` argument, optional for interactive mode;
 - **databasePath** (optional) specifies where the SQLite database should be created. Auto-derived from outputPath if omitted;
 - **resumeMode** (optional) controls resume behavior: `"auto"` (default), `"fresh"`, or `"resume"`;
@@ -241,7 +242,7 @@ Rules live in a separate JSON file so you can iterate on deterministic mappings 
 
 ```json
 {
-  "schema": "../examples/schema.jsonld",
+  "schema": "../node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld",
   "llm": {
     "default": false,
     "fields": []
@@ -289,12 +290,35 @@ Deterministic behaviour can be tuned per run:
 - `--rules <file>` – use a different rules file for the current invocation.
 - `--llm-fields field1,field2` – force specific schema paths through the LLM even if rules exist.
 - `--no-llm-fields field1,field2` – keep the listed paths deterministic for this run.
+- `--taxonomies <dir>` – resolve taxonomy enums from this directory instead of the installed `@npa-ai-co-lab/adc-schema` package (or the vendored fallback). Same effect as `taxonomiesPath` in the config file; the flag wins when both are set.
 
 With a complete rules file you can run the CLI without an `OPENAI_API_KEY`; the pipeline skips LLM calls when every row is satisfied deterministically.
 
+### ADC schema and taxonomies
+
+The Audience Data Commons data model — the JSON-LD schema and its eight controlled vocabularies (taxonomies) — is an open standard maintained in its own repository, [NPA-AI-Co-Lab/adc-schema](https://github.com/NPA-AI-Co-Lab/adc-schema), and published as the npm package [`@npa-ai-co-lab/adc-schema`](https://www.npmjs.com/package/@npa-ai-co-lab/adc-schema). This CLI is a consumer of that package, not its host: `npm install` brings the schema and taxonomies into `node_modules/@npa-ai-co-lab/adc-schema/`, and nothing in this repository defines the model.
+
+**Schema.** The CLI never hard-codes a schema; you pass it with `schemaPath` in the config file or `-s/--schema` on the command line. The sample configs point at the copy inside `node_modules`. Anyone without a checkout — for example running a globally installed CLI from a dataset folder — takes `adc.schema.jsonld` from the package's [GitHub Release](https://github.com/NPA-AI-Co-Lab/adc-schema/releases) (the `adc-schema-<version>.zip` asset also contains the taxonomies) or from its version-pinned raw URL, and points `schemaPath` at that file.
+
+**Taxonomies.** Fields with `enumFromTaxonomy` take their allowed values from `taxonomies/<Name>.json`. The CLI finds that directory in this order and stops at the first that exists:
+
+1. an explicit path — `taxonomiesPath` in the config file or `--taxonomies <dir>` on the command line (an explicit path that does not exist is an error, never silently replaced);
+2. the installed `@npa-ai-co-lab/adc-schema` package (the normal case);
+3. the copy bundled with the CLI under `vendor/taxonomies/` — a pinned fallback for offline or air-gapped machines where the package could not be installed.
+
+Every run reports which one it used, next to the database line at the start:
+
+```
+📚 Taxonomies: package (/…/node_modules/@npa-ai-co-lab/adc-schema/taxonomies)
+```
+
+The same information is recorded in the output metadata entry (`taxonomiesSource`, `taxonomiesPath`). If none of the three locations exists, the run stops before doing any work with an error that lists all three and what was wrong with each.
+
+`vendor/taxonomies/` must stay identical to the version of `@npa-ai-co-lab/adc-schema` in `package.json`; `npm run vendor:check` verifies it (also run by the test suite) and `npm run vendor:sync` refreshes it after a dependency bump. Do not edit those files by hand — changes to the model are made in the adc-schema repository.
+
 ### Schema file
 
-A proper schema file should be a JSONLD with the following structure:
+The ADC schema is described in the [adc-schema README](https://github.com/NPA-AI-Co-Lab/adc-schema#readme) — what `person`, `object` and `action` mean and how to read every property. This section covers what the CLI needs from a schema file. A proper schema file should be a JSONLD with the following structure (excerpt of the ADC schema):
 
 ```json
 {
@@ -452,7 +476,7 @@ A proper schema file should be a JSONLD with the following structure:
 
 Here **idProp** specifies which of the properties will constitute the **@id** of resulting JSONLD entity; required properties are specified via **"required": true**.
 
-You can also find examples of [config](./config.json) and [schema](./examples/schema.jsonld) files in the repository.
+You can also find an example [config](./config.json) in the repository; the full schema is [`schema/adc.schema.jsonld`](https://github.com/NPA-AI-Co-Lab/adc-schema/blob/main/schema/adc.schema.jsonld) in the adc-schema repository (installed locally at `node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld`).
 
 ### PII encoding file
 
@@ -486,7 +510,7 @@ There are several ways to enforce rules onto the fields of your schema. Most imp
 - **required** defines if the field can be left empty;
 - **format** enables enforcement of one of several basic string formats ($email$, $date$, $time$, $datetime$, $duration$, $uuid$);
 - **pattern** allows enforcement of other formats via a regex expression;
-- **enumFromTaxonomy** restricts possible field values to those of the correspoding taxonomy located in [the taxonomies folder](./taxonomies).
+- **enumFromTaxonomy** restricts possible field values to the `value` entries of the named taxonomy (`taxonomies/<Name>.json` in `@npa-ai-co-lab/adc-schema`); see [ADC schema and taxonomies](#adc-schema-and-taxonomies) for where the CLI looks for those files.
 
 ### Environment Configuration
 
@@ -584,8 +608,6 @@ npm run test:coverage
 
 ## Project Structure
 
-## Project Structure
-
 ```
 ├── src/
 │   ├── analysis/           # Analysis and processing logic
@@ -599,19 +621,22 @@ npm run test:coverage
 │   ├── utils/              # Utility functions
 │   ├── cli.ts              # Main CLI entry point
 │   ├── ...
-├── examples/                   # Sample data files for testing
 ├── static/
 │   ├── pii_field_map.json  # PII field mapping configuration
 │   ├── skeleton.json       # Base schema for LLM processing
 │   └── instructions.txt    # LLM model instructions
-├── examples/               # Sample files
-├── taxonomies/             # Structures of taxonomies present in the schema
+├── examples/               # Sample CSV data
+├── config/                 # Sample rules file and the hackathon config preset
+├── vendor/
+│   └── taxonomies/         # Pinned copy of the ADC taxonomies: offline fallback of the resolver
+├── scripts/                # Maintenance scripts (vendor:sync / vendor:check)
 ├── .env                    # Contains global constants
 ├── config.json             # Example config
 ├── CHANGELOG.md
 └── README.md
-
 ```
+
+The ADC schema and taxonomies themselves are not part of this tree: they live in `@npa-ai-co-lab/adc-schema` (under `node_modules/` after `npm install`).
 
 ### Versioning
 

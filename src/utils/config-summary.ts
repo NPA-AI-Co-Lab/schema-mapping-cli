@@ -9,9 +9,17 @@ export function showOptionsSummary(
   rateLimitMaxRetries?: number,
   rateLimitMaxWaitMs?: number,
   sdkMaxRetries?: number,
-  adaptiveConcurrency?: boolean
+  adaptiveConcurrency?: boolean,
+  taxonomiesPath?: string
 ) {
   console.log(`- Output path: ${outputPath}`);
+  console.log(
+    `- Taxonomies: ${
+      taxonomiesPath
+        ? `${taxonomiesPath} (explicit)`
+        : 'auto (installed @npa-ai-co-lab/adc-schema package, else vendored copy)'
+    }`
+  );
   console.log(`- Logging: ${enableLogging ? 'enabled' : 'disabled'}`);
   console.log(`- PII protection: ${hidePII ? 'enabled' : 'disabled'}`);
   console.log(`- Retries set: ${retriesNumber}`);

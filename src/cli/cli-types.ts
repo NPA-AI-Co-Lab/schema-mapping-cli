@@ -11,6 +11,7 @@ export interface CliOptions {
   output?: string;
   config?: string;
   rules?: string;
+  taxonomies?: string;
   llmFields?: string;
   noLlmFields?: string;
 
