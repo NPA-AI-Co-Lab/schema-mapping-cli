@@ -25,6 +25,9 @@ vi.mock('../src/utils/file-system.js', () => ({
 vi.mock('../src/jsonld/taxonomy.js', () => ({
   getTaxonomy: vi.fn(() => []),
   validateWithTaxonomy: vi.fn(() => true),
+  // imported by config-params.ts (taxonomy resolution before the options summary)
+  ADC_SCHEMA_PACKAGE: '@npa-ai-co-lab/adc-schema',
+  configureTaxonomies: vi.fn(),
 }));
 
 describe('Validation', () => {

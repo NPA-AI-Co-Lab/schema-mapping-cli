@@ -1,5 +1,11 @@
+import { describeTaxonomySource, type TaxonomyResolution } from '../jsonld/taxonomy.js';
+
 /**
- * Show configuration options summary
+ * Show configuration options summary.
+ *
+ * `taxonomies` is the *resolved* source (explicit | package | vendor plus the directory
+ * actually used), not the configured value, so the summary reports what the run will really
+ * read.
  */
 export function showOptionsSummary(
   outputPath: string,
@@ -10,16 +16,12 @@ export function showOptionsSummary(
   rateLimitMaxWaitMs?: number,
   sdkMaxRetries?: number,
   adaptiveConcurrency?: boolean,
-  taxonomiesPath?: string
+  taxonomies?: TaxonomyResolution
 ) {
   console.log(`- Output path: ${outputPath}`);
-  console.log(
-    `- Taxonomies: ${
-      taxonomiesPath
-        ? `${taxonomiesPath} (explicit)`
-        : 'auto (installed @npa-ai-co-lab/adc-schema package, else vendored copy)'
-    }`
-  );
+  if (taxonomies) {
+    console.log(`- Taxonomies: ${describeTaxonomySource(taxonomies)}`);
+  }
   console.log(`- Logging: ${enableLogging ? 'enabled' : 'disabled'}`);
   console.log(`- PII protection: ${hidePII ? 'enabled' : 'disabled'}`);
   console.log(`- Retries set: ${retriesNumber}`);

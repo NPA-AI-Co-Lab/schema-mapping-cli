@@ -306,7 +306,9 @@ The Audience Data Commons data model — the JSON-LD schema and its eight contro
 2. the installed `@npa-ai-co-lab/adc-schema` package (the normal case);
 3. the copy bundled with the CLI under `vendor/taxonomies/` — a pinned fallback for offline or air-gapped machines where the package could not be installed.
 
-Every run reports which one it used, next to the database line at the start:
+A candidate directory only counts if it contains at least one `*.json` file (an empty explicit directory is an error; an empty package or vendor directory is skipped and listed as such). `--taxonomies` overrides `taxonomiesPath` before any path validation, so it also rescues a wrong value in the config file. A schema property whose taxonomy file is missing (or empty) in the resolved directory is a configuration error that stops the run before any data is read — the message names the property, the file it looked for and the directory in use. Taxonomy files are validated on load (a JSON array of `{ "notation", "value" }` objects). A taxonomy referenced only by the deterministic rules and missing from the directory produces a single warning per run and the value passes through unchanged.
+
+Every run reports which one it used, on stderr next to the option summary (silent under `--quiet` / `--stdout`):
 
 ```
 📚 Taxonomies: package (/…/node_modules/@npa-ai-co-lab/adc-schema/taxonomies)
@@ -314,7 +316,7 @@ Every run reports which one it used, next to the database line at the start:
 
 The same information is recorded in the output metadata entry (`taxonomiesSource`, `taxonomiesPath`). If none of the three locations exists, the run stops before doing any work with an error that lists all three and what was wrong with each.
 
-`vendor/taxonomies/` must stay identical to the version of `@npa-ai-co-lab/adc-schema` in `package.json`; `npm run vendor:check` verifies it (also run by the test suite) and `npm run vendor:sync` refreshes it after a dependency bump. Do not edit those files by hand — changes to the model are made in the adc-schema repository.
+`vendor/taxonomies/` must stay identical to the version of `@npa-ai-co-lab/adc-schema` in `package.json`; `npm run vendor:check` verifies it (also run by the test suite, in CI and before `npm pack`) and `npm run vendor:sync` refreshes it — copying the package's taxonomies and deleting stale vendored files — after a dependency bump. Do not edit those files by hand — changes to the model are made in the adc-schema repository.
 
 ### Schema file
 
@@ -630,6 +632,7 @@ npm run test:coverage
 ├── vendor/
 │   └── taxonomies/         # Pinned copy of the ADC taxonomies: offline fallback of the resolver
 ├── scripts/                # Maintenance scripts (vendor:sync / vendor:check)
+├── .github/workflows/      # CI: build, vendor:check, tests
 ├── .env                    # Contains global constants
 ├── config.json             # Example config
 ├── CHANGELOG.md

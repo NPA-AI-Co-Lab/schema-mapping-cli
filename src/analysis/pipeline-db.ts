@@ -29,6 +29,7 @@ import {
   createJsonLDWriter,
   getLLMSchema,
   configureTaxonomies,
+  describeTaxonomySource,
   JsonLdSchema,
 } from '../jsonld/index.js';
 import { createLogger } from '../logging.js';
@@ -162,8 +163,12 @@ export async function analyzeDataWithDb(
   llmClient?: ILLMClient,
   quiet: boolean = false
 ): Promise<AnalysisRunSummary> {
-  // Normalize and validate configuration
+  // Normalize configuration, then pick the taxonomy directory for this run: explicit path →
+  // installed adc-schema package → vendored fallback. It fails here, before validateConfig and
+  // before any work is done, with an error that lists every location tried and names the
+  // options involved.
   const normalizedConfig = normalizeConfig(config);
+  const taxonomies = configureTaxonomies(normalizedConfig.taxonomiesPath);
   validateConfig(normalizedConfig);
 
   const {
@@ -194,18 +199,26 @@ export async function analyzeDataWithDb(
   const filePaths = getFilePaths(normalizedConfig);
   const dbPath = databasePath || deriveDatabasePath(outputPath);
 
-  // Pick the taxonomy directory for this run: explicit path → installed adc-schema package →
-  // vendored fallback. Fails here, before any work is done, listing every location tried.
-  const taxonomies = configureTaxonomies(normalizedConfig.taxonomiesPath);
-
   if (!quiet) {
+    // Same stream as the CLI's option summary (stderr), so stdout stays clean for --stdout runs.
+    console.error(`📚 Taxonomies: ${describeTaxonomySource(taxonomies)}`);
     console.log(`\n🗄️  Database: ${dbPath}`);
-    console.log(`📚 Taxonomies: ${taxonomies.source} (${taxonomies.dir})`);
     console.log(`📁 Processing ${filePaths.length} file(s)`);
     for (const fp of filePaths) {
       console.log(`   - ${path.basename(fp)}`);
     }
   }
+
+  // Convert the schema (and load the rules) before the database is opened: a schema property
+  // whose taxonomy is missing, or a broken rules file, is a configuration error that must
+  // stop the run here — not surface as a per-batch failure or a "progress saved" hint.
+  const schema = getLLMSchema(schemaPath);
+  const rawJsonLdSchema = loadJSON<JsonLdSchema>(schemaPath);
+  const rulesContext: LoadedRules | null = loadRulesConfig({
+    rulesPath,
+    schemaPath,
+    overrides: llmFieldOverrides,
+  });
 
   // Initialize database
   const db = new DatabaseManager(dbPath);
@@ -306,9 +319,7 @@ export async function analyzeDataWithDb(
     }
     db.state.markProcessingStarted();
 
-    // Load schema and setup
-    const schema = getLLMSchema(schemaPath);
-    const rawJsonLdSchema = loadJSON<JsonLdSchema>(schemaPath);
+    // Schema setup (the schema itself was converted above, before the database was opened)
     const provenanceEntry = buildOutputProvenanceEntry(
       rawJsonLdSchema,
       normalizedConfig,
@@ -335,12 +346,6 @@ export async function analyzeDataWithDb(
     flushLogsRef = flushLogs;
 
     const { encodePII, decodePII } = createPIIHandlers(enablePiiProcessing);
-
-    const rulesContext: LoadedRules | null = loadRulesConfig({
-      rulesPath,
-      schemaPath,
-      overrides: llmFieldOverrides,
-    });
 
     const partialSchemaCache = new Map<string, { instructions: string; zodSchema: ZodTypeAny }>();
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { createRequire } from 'module';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -10,9 +11,11 @@ import {
   resetTaxonomyResolution,
   describeTaxonomySource,
   getTaxonomy,
+  handleTaxonomyEnum,
   TaxonomyResolutionError,
   ADC_SCHEMA_PACKAGE,
 } from '../src/jsonld/taxonomy.js';
+import { ConfigurationError } from '../src/utils/errors.js';
 import { transformRow } from '../src/analysis/rules/row-transformer.js';
 import type { LoadedRules } from '../src/analysis/rules/types.js';
 
@@ -50,6 +53,16 @@ function makeFakePackage(withTaxonomies: boolean): string {
 
 const NO_PACKAGE = () => null;
 const NO_VENDOR = path.join(tmpdir(), 'adc-vendor-does-not-exist-' + process.pid);
+
+/** Whether the real adc-schema package is resolvable from this test file (as the CLI resolves it). */
+function packageIsInstalled(): boolean {
+  try {
+    createRequire(import.meta.url).resolve(`${ADC_SCHEMA_PACKAGE}/package.json`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 describe('taxonomy resolver', () => {
   const tempDirs: string[] = [];
@@ -131,6 +144,45 @@ describe('taxonomy resolver', () => {
       });
     });
 
+    it('skips a package whose taxonomies/ directory is empty (no *.json files)', () => {
+      const pkg = track(makeFakePackage(false));
+      mkdirSync(path.join(pkg, 'taxonomies'));
+      writeFileSync(path.join(pkg, 'taxonomies', 'README.md'), 'nothing here');
+      const vendor = track(makeTaxonomyDir([{ notation: 'GENDER_VENDOR', value: 'from_vendor' }]));
+
+      const resolution = resolveTaxonomiesDir(undefined, {
+        locatePackageDir: () => pkg,
+        vendorDir: vendor,
+      });
+
+      expect(resolution.source).toBe('vendor');
+      expect(resolution.tried[1]).toEqual({
+        source: 'package',
+        dir: path.join(pkg, 'taxonomies'),
+        reason: expect.stringMatching(/directory is empty/),
+      });
+    });
+
+    it('skips an empty vendor directory and reports it in the error', () => {
+      const emptyVendor = track(mkdtempSync(path.join(tmpdir(), 'adc-empty-vendor-')));
+
+      let caught: unknown;
+      try {
+        resolveTaxonomiesDir(undefined, { locatePackageDir: NO_PACKAGE, vendorDir: emptyVendor });
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(TaxonomyResolutionError);
+      const error = caught as TaxonomyResolutionError;
+      expect(error.tried[2]).toEqual({
+        source: 'vendor',
+        dir: path.resolve(emptyVendor),
+        reason: expect.stringMatching(/directory is empty/),
+      });
+      expect(error.message).toMatch(/3\. vendored fallback .*directory is empty/);
+    });
+
     it('treats an empty explicit path as "not set"', () => {
       const vendor = track(makeTaxonomyDir([{ notation: 'X', value: 'x' }]));
       const resolution = resolveTaxonomiesDir('   ', {
@@ -161,6 +213,31 @@ describe('taxonomy resolver', () => {
       expect(error.message).toMatch(/taxonomiesPath|--taxonomies/);
       expect(error.tried).toEqual([
         { source: 'explicit', dir: path.resolve(missing), reason: 'does not exist' },
+      ]);
+    });
+
+    it('an explicit path that is an empty directory is a hard error, never replaced by a fallback', () => {
+      const vendor = track(makeTaxonomyDir([{ notation: 'X', value: 'x' }]));
+      const empty = track(mkdtempSync(path.join(tmpdir(), 'adc-empty-explicit-')));
+
+      let caught: unknown;
+      try {
+        resolveTaxonomiesDir(empty, { locatePackageDir: NO_PACKAGE, vendorDir: vendor });
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(TaxonomyResolutionError);
+      const error = caught as TaxonomyResolutionError;
+      expect(error.message).toContain(path.resolve(empty));
+      expect(error.message).toMatch(/directory is empty/);
+      expect(error.message).toMatch(/taxonomiesPath|--taxonomies/);
+      expect(error.tried).toEqual([
+        {
+          source: 'explicit',
+          dir: path.resolve(empty),
+          reason: expect.stringMatching(/directory is empty/),
+        },
       ]);
     });
 
@@ -235,25 +312,121 @@ describe('taxonomy resolver', () => {
       expect(getTaxonomy('Gender-v1')[0].value).toBe('second');
     });
 
-    it('a taxonomy that is missing inside a resolved directory yields [] and a warning naming the source', () => {
+    it('a taxonomy that is missing inside a resolved directory yields [] and warns ONCE per name, not per lookup', () => {
       const explicit = track(makeTaxonomyDir([{ notation: 'X', value: 'x' }]));
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       configureTaxonomies(explicit);
 
-      expect(getTaxonomy('DoesNotExist-v1')).toEqual([]);
+      // 17 lookups (one per row of a 16-row file plus the schema conversion) → one warning
+      for (let i = 0; i < 17; i++) {
+        expect(getTaxonomy('DoesNotExist-v1')).toEqual([]);
+      }
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0][0]).toMatch(/DoesNotExist-v1\.json/);
       expect(warn.mock.calls[0][0]).toMatch(/source: explicit/);
+
+      // a second missing name warns once more; re-configuring resets the negative cache
+      expect(getTaxonomy('AlsoMissing-v1')).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(2);
+      configureTaxonomies(explicit);
+      expect(getTaxonomy('DoesNotExist-v1')).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(3);
     });
 
-    it('with no configuration, the default precedence resolves to a real directory with the ADC taxonomies', () => {
-      // No options: real package lookup and the repository's own vendor/taxonomies.
-      const resolution = getTaxonomyResolution();
+    it('a taxonomy file that is not an array of { notation, value } objects is a ConfigurationError', () => {
+      const dir = track(mkdtempSync(path.join(tmpdir(), 'adc-bad-tax-')));
+      writeFileSync(
+        path.join(dir, 'NotArray-v1.json'),
+        JSON.stringify({ notation: 'A', value: 'a' })
+      );
+      writeFileSync(
+        path.join(dir, 'BadEntry-v1.json'),
+        JSON.stringify([{ notation: 'A', value: 'a' }, { notation: 'B' }])
+      );
+      writeFileSync(path.join(dir, 'NotJson-v1.json'), '{ this is not json');
+      configureTaxonomies(dir);
 
-      expect(['package', 'vendor']).toContain(resolution.source);
+      expect(() => getTaxonomy('NotArray-v1')).toThrow(ConfigurationError);
+      expect(() => getTaxonomy('NotArray-v1')).toThrow(/must contain a JSON array/);
+      expect(() => getTaxonomy('BadEntry-v1')).toThrow(ConfigurationError);
+      expect(() => getTaxonomy('BadEntry-v1')).toThrow(/entry 1 is not a/);
+      expect(() => getTaxonomy('NotJson-v1')).toThrow(/not valid JSON/);
+    });
+
+    it.skipIf(!packageIsInstalled())(
+      'with no configuration and the package installed, the default precedence picks the package',
+      () => {
+        // No options: real package lookup, as the CLI does it.
+        const resolution = getTaxonomyResolution();
+
+        expect(resolution.source).toBe('package');
+        expect(resolution.dir).toBe(
+          path.join(
+            path.dirname(
+              createRequire(import.meta.url).resolve(`${ADC_SCHEMA_PACKAGE}/package.json`)
+            ),
+            'taxonomies'
+          )
+        );
+        expect(getTaxonomy('Gender-v1')).toHaveLength(4);
+        expect(getTaxonomy('ActionType-v1').map((t) => t.value)).toContain('web_read');
+      }
+    );
+
+    it('when the package cannot be located, the default vendor directory of the repository is used', () => {
+      const resolution = configureTaxonomies(undefined, { locatePackageDir: () => null });
+
+      expect(resolution.source).toBe('vendor');
+      expect(resolution.dir).toBe(path.resolve(process.cwd(), 'vendor', 'taxonomies'));
+      expect(resolution.tried.map((c) => c.source)).toEqual(['explicit', 'package']);
       expect(getTaxonomy('Gender-v1')).toHaveLength(4);
       expect(getTaxonomy('ActionType-v1').map((t) => t.value)).toContain('web_read');
+    });
+  });
+
+  describe('handleTaxonomyEnum (schema enumFromTaxonomy)', () => {
+    it('returns the taxonomy values for a property whose taxonomy exists', () => {
+      const dir = track(makeTaxonomyDir([{ notation: 'GENDER_MALE', value: 'male' }]));
+      configureTaxonomies(dir);
+
+      expect(
+        handleTaxonomyEnum({ type: 'string', enumFromTaxonomy: 'Gender-v1' }, 'person.gender')
+      ).toEqual(['male']);
+      expect(handleTaxonomyEnum({ type: 'string' })).toBeUndefined();
+    });
+
+    it('throws a ConfigurationError (never returns enum: []) when the taxonomy file is missing', () => {
+      const dir = track(makeTaxonomyDir([{ notation: 'X', value: 'x' }]));
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      configureTaxonomies(dir);
+
+      let caught: unknown;
+      try {
+        handleTaxonomyEnum(
+          { type: 'string', enumFromTaxonomy: 'Tier-v1' },
+          'person.demographics.tier'
+        );
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(ConfigurationError);
+      const message = (caught as Error).message;
+      expect(message).toContain('person.demographics.tier');
+      expect(message).toContain('Tier-v1');
+      expect(message).toContain(path.join(path.resolve(dir), 'Tier-v1.json'));
+      expect(message).toMatch(/does not exist/);
+      expect(message).toContain(`Taxonomies source: explicit (${path.resolve(dir)})`);
+    });
+
+    it('throws a ConfigurationError when the taxonomy file exists but is empty', () => {
+      const dir = track(makeTaxonomyDir([], 'Empty-v1'));
+      configureTaxonomies(dir);
+
+      expect(() =>
+        handleTaxonomyEnum({ type: 'string', enumFromTaxonomy: 'Empty-v1' }, 'object.kind')
+      ).toThrow(/"object\.kind".*Empty-v1.*contains no entries/);
     });
   });
 

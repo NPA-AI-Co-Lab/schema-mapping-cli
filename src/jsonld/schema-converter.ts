@@ -16,9 +16,11 @@ function addNullability(schema: JsonSchema, isRequired: boolean): JsonSchema {
 }
 
 /**
- * Convert JSON-LD property to JSON Schema format
+ * Convert JSON-LD property to JSON Schema format.
+ * `propertyPath` (e.g. `person.demographics.gender`) is only used to name the property in
+ * configuration errors such as a missing taxonomy.
  */
-export function convertProperty(prop: JsonLdProperty): JsonSchema {
+export function convertProperty(prop: JsonLdProperty, propertyPath?: string): JsonSchema {
   // Extract JSON-LD specific fields that should not be in JSON Schema
   const { required: isRequired, enumFromTaxonomy, ...jsonSchemaFields } = prop;
 
@@ -26,12 +28,12 @@ export function convertProperty(prop: JsonLdProperty): JsonSchema {
 
   // Handle taxonomy enums
   if (enumFromTaxonomy) {
-    result.enum = handleTaxonomyEnum(prop);
+    result.enum = handleTaxonomyEnum(prop, propertyPath);
   }
 
   // Handle nested items (for arrays)
   if (prop.items) {
-    result.items = convertProperty(prop.items);
+    result.items = convertProperty(prop.items, propertyPath ? `${propertyPath}[]` : undefined);
   }
 
   // Handle nested properties (for objects)
@@ -40,7 +42,7 @@ export function convertProperty(prop: JsonLdProperty): JsonSchema {
     const requiredFields: string[] = [];
 
     for (const [key, value] of Object.entries(prop.properties)) {
-      nestedProps[key] = convertProperty(value);
+      nestedProps[key] = convertProperty(value, propertyPath ? `${propertyPath}.${key}` : key);
       // OpenAI requires all nested fields in required array too
       requiredFields.push(key);
     }
@@ -58,12 +60,12 @@ export function convertProperty(prop: JsonLdProperty): JsonSchema {
  * For OpenAI's structured outputs: ALL fields must be in required array,
  * with optional fields marked as nullable in the property definition
  */
-export function convertEntityToJsonSchema(entity: JsonLdEntity): JsonSchema {
+export function convertEntityToJsonSchema(entity: JsonLdEntity, entityName?: string): JsonSchema {
   const props: Record<string, unknown> = {};
   const required: string[] = [];
 
   for (const [key, prop] of Object.entries(entity.properties)) {
-    props[key] = convertProperty(prop);
+    props[key] = convertProperty(prop, entityName ? `${entityName}.${key}` : key);
     // OpenAI requires all fields in required array
     required.push(key);
   }
@@ -85,7 +87,7 @@ export function jsonLdToJsonSchema(jsonLd: JsonLdSchema): {
   const definitions: Record<string, unknown> = {};
 
   for (const [entityName, entity] of Object.entries(jsonLd.entities)) {
-    definitions[entityName] = convertEntityToJsonSchema(entity);
+    definitions[entityName] = convertEntityToJsonSchema(entity, entityName);
   }
 
   return {

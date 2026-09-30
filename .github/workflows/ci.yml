@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Build, vendor check and tests (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # installs @npa-ai-co-lab/adc-schema (schema + taxonomies) from the npm registry
+      - run: npm ci
+
+      - run: npm run build
+
+      # vendor/taxonomies (offline fallback of the taxonomy resolver) must match the installed package
+      - run: npm run vendor:check
+
+      - run: npm test -- --run

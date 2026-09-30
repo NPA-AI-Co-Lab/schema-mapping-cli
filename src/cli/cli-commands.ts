@@ -52,9 +52,12 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
     console.error(`\n${bold(`Welcome to ${pkg.name} ${pkg.version}!`)}\n`);
   }
 
+  // --taxonomies is applied over the config file *inside* these helpers, before any path
+  // validation, so a wrong taxonomiesPath in the file can be rescued from the CLI.
+  const overrides = { taxonomiesPath: options.taxonomies };
   const baseParams = options.config
-    ? await getAppParamsFromConfig(options.config)
-    : await getAppParams();
+    ? await getAppParamsFromConfig(options.config, overrides)
+    : await getAppParams(overrides);
 
   const includeFields = parseFieldList(options.llmFields);
   const excludeFields = parseFieldList(options.noLlmFields);
@@ -149,7 +152,10 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
 
   // Get base config and apply CLI overrides
   // Explicit -c file, else ./config.json when present, else built-in defaults — a CLI-only
-  // invocation (-i/-s/-o) must work from any directory.
+  // invocation (-i/-s/-o) must work from any directory. --taxonomies is merged here, before
+  // analyzeDataWithDb resolves and validates anything, so a wrong taxonomiesPath in the config
+  // file can be rescued from the CLI. The resolved `📚 Taxonomies:` line is printed by the
+  // pipeline on stderr, right after the summary below.
   const baseConfig = loadBaseAppConfig(options.config);
 
   const includeFields = parseFieldList(options.llmFields);

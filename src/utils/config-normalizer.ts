@@ -121,14 +121,9 @@ export function validateConfig(config: AppConfig): void {
     errors.push(`Rules file not found: ${config.rulesPath}`);
   }
 
-  // Validate taxonomies directory if specified (an explicit path is never silently ignored)
-  if (config.taxonomiesPath) {
-    if (!existsSync(config.taxonomiesPath)) {
-      errors.push(`Taxonomies directory not found: ${config.taxonomiesPath}`);
-    } else if (!fs.statSync(config.taxonomiesPath).isDirectory()) {
-      errors.push(`taxonomiesPath must point to a directory: ${config.taxonomiesPath}`);
-    }
-  }
+  // `taxonomiesPath` is intentionally not checked here: the taxonomy resolver
+  // (configureTaxonomies) validates it before this runs and its error names every option
+  // and location involved, which is the message the user should see.
 
   // Validate resume mode
   if (config.resumeMode && !['auto', 'fresh', 'resume'].includes(config.resumeMode)) {

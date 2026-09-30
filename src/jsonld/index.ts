@@ -17,6 +17,8 @@ export {
   getTaxonomyResolution,
   resetTaxonomyResolution,
   describeTaxonomySource,
+  getTaxonomyFilePath,
+  isTaxonomyMissing,
   TaxonomyResolutionError,
   ADC_SCHEMA_PACKAGE,
 } from './taxonomy.js';

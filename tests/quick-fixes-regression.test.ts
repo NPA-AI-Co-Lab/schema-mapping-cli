@@ -14,7 +14,9 @@ import type {
 } from '../src/interfaces/llm-client.interface.js';
 
 // The ADC schema now ships in the @npa-ai-co-lab/adc-schema package (no longer in examples/).
-const ADC_SCHEMA_PATH = createRequire(import.meta.url).resolve('@npa-ai-co-lab/adc-schema');
+const ADC_SCHEMA_PATH = createRequire(import.meta.url).resolve(
+  '@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld'
+);
 
 describe('qf-1/qf-2 regression tests', () => {
   let tempDir: string;

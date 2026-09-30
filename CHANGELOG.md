@@ -15,19 +15,24 @@ content of the data model.
 
 ### Added
 
-- Dependency on `@npa-ai-co-lab/adc-schema` (^1.0.0); `npm install` brings the schema and the eight taxonomies into `node_modules/`
-- Taxonomy resolver (`src/jsonld/taxonomy.ts`): the taxonomy directory is looked up in order — explicit path → installed `@npa-ai-co-lab/adc-schema` package → vendored fallback `vendor/taxonomies/`. An explicit path that does not exist is a configuration error and is never silently replaced; when nothing resolves, the error lists every location tried and why it was skipped
-- Configuration option `taxonomiesPath` and CLI flag `--taxonomies <dir>` (validated as an existing directory; the flag overrides the config key)
-- Run summary line `📚 Taxonomies: explicit|package|vendor (<dir>)` stating which source was actually used; the same is recorded in the output metadata entry (`taxonomiesSource`, `taxonomiesPath`)
-- `vendor/taxonomies/` — pinned copy of the taxonomies from `@npa-ai-co-lab/adc-schema` for offline and air-gapped installs, marked read-only in `vendor/README.md`; `npm run vendor:check` (also a test) verifies it matches the installed package, `npm run vendor:sync` refreshes it after a dependency bump
-- Tests: `tests/taxonomy-resolver.test.ts` (15) and `tests/taxonomies-config.test.ts` (11) — precedence, error listing, config/CLI surface, end-to-end rules-only run with an explicit directory, vendor parity. Suite grows from 207 to 233
+- Dependency on `@npa-ai-co-lab/adc-schema` (`^1.0.0`, installed from the npm registry); `npm install` brings the schema and the eight taxonomies into `node_modules/`
+- Taxonomy resolver (`src/jsonld/taxonomy.ts`): the taxonomy directory is looked up in order — explicit path (`taxonomiesPath` / `--taxonomies`) → installed `@npa-ai-co-lab/adc-schema` package → vendored fallback `vendor/taxonomies/`. A candidate counts only if it is a directory with at least one `*.json` file (an empty explicit directory is an error; an empty package/vendor directory is skipped and listed as "directory is empty"). An explicit path that does not exist is a configuration error and is never silently replaced; when nothing resolves, the error lists every location tried and why it was skipped
+- Configuration option `taxonomiesPath` and CLI flag `--taxonomies <dir>`; the flag overrides the config key before any path validation in every mode (CLI, `-c`, interactive), so a wrong path in the file can be rescued from the command line
+- Run summary line `📚 Taxonomies: explicit|package|vendor (<dir>)` stating which source was actually used — on stderr with the rest of the option summary, silent under `--quiet` / `--stdout`; the interactive/config summary prints the resolved source too; the same is recorded in the output metadata entry (`taxonomiesSource`, `taxonomiesPath`)
+- A schema property whose `enumFromTaxonomy` file is missing or empty in the resolved directory is a fatal `ConfigurationError` raised before the database is opened or any row is read — it names the property, the file looked for, the directory and its source — instead of an `enum: []` that failed every batch
+- Taxonomy files are validated on load (must be a JSON array of `{ notation, value }` objects; otherwise a `ConfigurationError`)
+- `vendor/taxonomies/` — pinned copy of the taxonomies from `@npa-ai-co-lab/adc-schema` 1.0.0 for offline and air-gapped installs, marked read-only in `vendor/README.md`; `npm run vendor:check` verifies it matches the installed package (also run by `prepack`, CI and the test suite), `npm run vendor:sync` refreshes it and deletes stale vendored files
+- GitHub Actions workflow `.github/workflows/ci.yml` (push to `main`, pull requests, manual): Node 22, `npm ci`, build, `vendor:check`, tests
+- Tests: `tests/taxonomy-resolver.test.ts` (23) and `tests/taxonomies-config.test.ts` (13) — precedence (package when installed, vendor when not), empty-directory handling, error listing, config/CLI surface, end-to-end rules-only run with an explicit directory, the fatal missing-taxonomy errors, file-shape validation, vendor parity. Suite grows from 207 to 243
 
 ### Changed
 
-- Default `schemaPath` in `config.json`, `config/hackathon.config.json` and the `schema` reference in `config/sample_comments.rules.json` now point at the schema inside the installed package (`node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld`) instead of `examples/schema.jsonld`
+- Default `schemaPath` in `config.json`, `config/hackathon.config.json` and the `schema` reference in `config/sample_comments.rules.json` now point at the schema inside the installed package (`node_modules/@npa-ai-co-lab/adc-schema/schema/adc.schema.jsonld`) instead of `examples/schema.jsonld`. The schema itself is still supplied via `schemaPath` / `-s` (required, as before)
+- `validateConfig` no longer checks `taxonomiesPath` itself: the taxonomy resolver runs first and its message (naming `--taxonomies`, `taxonomiesPath` and the package) is the one the user sees
+- The schema is converted and the rules file loaded before the SQLite database is opened, so configuration errors stop the run without a misleading "progress saved" hint
 - `files` whitelist ships `vendor/` instead of `taxonomies/`
 - `createConfigHash` includes `taxonomiesPath` only when it is set, so hashes of existing configs (and resume detection on existing databases) are unchanged
-- A missing individual taxonomy file still yields an empty enum with a warning; the warning now names the taxonomy source in use
+- A taxonomy missing from the resolved directory that only the deterministic rules reference still yields an empty list with a warning; the warning names the taxonomy source and is emitted once per taxonomy per run instead of once per row
 - README: new section "ADC schema and taxonomies"; `schemaPath`, `taxonomiesPath` and `--taxonomies` documented; project structure updated
 
 ### Removed

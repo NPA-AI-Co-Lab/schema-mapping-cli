@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync } from 'fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync, existsSync } from 'fs';
 import { createRequire } from 'module';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -15,7 +15,12 @@ import { validateConfigPaths } from '../src/utils/config-path-validator.js';
 import { validateDirectoryPath } from '../src/utils/validation.js';
 import { setupCliProgram } from '../src/cli/cli-setup.js';
 import { analyzeDataWithDb } from '../src/analysis/pipeline-db.js';
-import { resetTaxonomyResolution, ADC_SCHEMA_PACKAGE } from '../src/jsonld/taxonomy.js';
+import {
+  resetTaxonomyResolution,
+  ADC_SCHEMA_PACKAGE,
+  TaxonomyResolutionError,
+} from '../src/jsonld/taxonomy.js';
+import { ConfigurationError } from '../src/utils/errors.js';
 import type { AppConfig } from '../src/utils/types.js';
 import type {
   ILLMClient,
@@ -78,17 +83,14 @@ describe('taxonomiesPath config key', () => {
     ).not.toThrow();
   });
 
-  it('validateConfig rejects a taxonomiesPath that does not exist or is not a directory', () => {
+  it('validateConfig leaves taxonomiesPath to the resolver (whose error names the options and the package)', () => {
+    // A bad taxonomiesPath is reported by configureTaxonomies (run before validateConfig in the
+    // pipeline) with a message naming --taxonomies / taxonomiesPath and the package — not by a
+    // generic "directory not found" line here.
     const dir = tempDir();
-    const file = path.join(dir, 'x.json');
-    writeFileSync(file, '[]');
-
     expect(() =>
       validateConfig(normalizeConfig(minimalConfig({ taxonomiesPath: path.join(dir, 'missing') })))
-    ).toThrow(/Taxonomies directory not found/);
-    expect(() => validateConfig(normalizeConfig(minimalConfig({ taxonomiesPath: file })))).toThrow(
-      /taxonomiesPath must point to a directory/
-    );
+    ).not.toThrow();
   });
 
   it('validateConfigPaths reports a bad taxonomies directory alongside the other path errors', () => {
@@ -178,11 +180,26 @@ describe('end-to-end: rules-only run with an explicit taxonomies directory', () 
     }
   }
 
+  /** Same schema without the taxonomy-backed property (nothing to resolve from the taxonomies). */
+  const SCHEMA_NO_TAXONOMY = {
+    ...SCHEMA,
+    entities: {
+      person: {
+        ...SCHEMA.entities.person,
+        properties: {
+          userID: SCHEMA.entities.person.properties.userID,
+          tier: { type: 'string', description: 'Membership tier' },
+        },
+      },
+    },
+  };
+
   beforeEach(async () => {
     resetTaxonomyResolution();
     dir = mkdtempSync(path.join(tmpdir(), 'adc-e2e-'));
     writeFileSync(path.join(dir, 'data.csv'), 'userID,tier\nu1,TIER_GOLD\nu2,silver\n');
     writeFileSync(path.join(dir, 'schema.jsonld'), JSON.stringify(SCHEMA));
+    writeFileSync(path.join(dir, 'schema-no-taxonomy.jsonld'), JSON.stringify(SCHEMA_NO_TAXONOMY));
     writeFileSync(
       path.join(dir, 'rules.json'),
       JSON.stringify({
@@ -232,8 +249,9 @@ describe('end-to-end: rules-only run with an explicit taxonomies directory', () 
     };
   }
 
-  it('normalises values with the explicit taxonomy, prints the source in the run summary and records it in provenance', async () => {
+  it('normalises values with the explicit taxonomy, prints the source on stderr and records it in provenance', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const taxonomiesPath = path.join(dir, 'taxonomies');
 
     const summary = await analyzeDataWithDb(
@@ -243,11 +261,13 @@ describe('end-to-end: rules-only run with an explicit taxonomies directory', () 
     );
     expect(summary.failedBatchCount).toBe(0);
 
-    // run summary line names the source that was actually used
-    const summaryLine = logSpy.mock.calls
-      .flat()
-      .find((l) => typeof l === 'string' && l.includes('Taxonomies:'));
-    expect(summaryLine).toBe(`📚 Taxonomies: explicit (${path.resolve(taxonomiesPath)})`);
+    // run summary line names the source actually used and goes to stderr (same stream as the
+    // CLI's option summary), never to stdout
+    const stderrLines = errSpy.mock.calls.flat().filter((l) => typeof l === 'string');
+    expect(stderrLines).toContain(`📚 Taxonomies: explicit (${path.resolve(taxonomiesPath)})`);
+    expect(
+      logSpy.mock.calls.flat().some((l) => typeof l === 'string' && /Taxonomies:/.test(l))
+    ).toBe(false);
 
     const output = JSON.parse(readFileSync(path.join(dir, 'output.jsonld'), 'utf8'));
     // entity records are { person: {...}, '@context': {...} }; the provenance record is the Dataset
@@ -265,29 +285,106 @@ describe('end-to-end: rules-only run with an explicit taxonomies directory', () 
   });
 
   it('without taxonomiesPath the run resolves the package or vendored copy and says which', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {}); // Tier-v1 is unknown there → warning + passthrough
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await analyzeDataWithDb(config(), new NeverCalledClient(), false);
+    // The schema must not reference Tier-v1 (it exists only in the explicit directory): a
+    // schema property whose taxonomy is missing is a fatal configuration error (see below).
+    // The rules still name Tier-v1: for the deterministic path a missing taxonomy is a
+    // single warning and the value passes through unchanged.
+    await analyzeDataWithDb(
+      config({ schemaPath: path.join(dir, 'schema-no-taxonomy.jsonld') }),
+      new NeverCalledClient(),
+      false
+    );
 
-    const summaryLine = logSpy.mock.calls
+    const summaryLine = errSpy.mock.calls
       .flat()
       .find((l) => typeof l === 'string' && l.includes('Taxonomies:'));
     expect(summaryLine).toMatch(/^📚 Taxonomies: (package|vendor) \(/);
 
+    // one warning for the missing Tier-v1, not one per row
+    const tierWarnings = warnSpy.mock.calls
+      .flat()
+      .filter((l) => typeof l === 'string' && l.includes('Tier-v1.json'));
+    expect(tierWarnings).toHaveLength(1);
+
     const output = JSON.parse(readFileSync(path.join(dir, 'output.jsonld'), 'utf8'));
     const provenance = output.find((e: any) => e['@type'] === 'Dataset');
     expect(['package', 'vendor']).toContain(provenance.taxonomiesSource);
+    const people = output.filter((e: any) => e.person).map((e: any) => e.person);
+    expect(people.map((p: any) => p.tier).sort()).toEqual(['TIER_GOLD', 'silver']);
   });
 
-  it('a taxonomiesPath that does not exist fails validation before any work is done', async () => {
-    await expect(
-      analyzeDataWithDb(
-        config({ taxonomiesPath: path.join(dir, 'nope') }),
-        new NeverCalledClient(),
-        true
-      )
-    ).rejects.toThrow(/Taxonomies directory not found/);
+  it('a taxonomiesPath that does not exist fails with the resolver error (naming --taxonomies, taxonomiesPath and the package) before any work is done', async () => {
+    const missing = path.join(dir, 'nope');
+    let caught: unknown;
+    try {
+      await analyzeDataWithDb(config({ taxonomiesPath: missing }), new NeverCalledClient(), true);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(TaxonomyResolutionError);
+    const message = (caught as Error).message;
+    expect(message).toContain(missing);
+    expect(message).toMatch(/does not exist/);
+    expect(message).toContain('--taxonomies');
+    expect(message).toContain('taxonomiesPath');
+    expect(message).toContain(ADC_SCHEMA_PACKAGE);
+    expect(message).not.toMatch(/Taxonomies directory not found/);
+    // nothing was ingested / written
+    expect(existsSync(path.join(dir, 'pipeline.db'))).toBe(false);
+    expect(existsSync(path.join(dir, 'output.jsonld'))).toBe(false);
+  });
+
+  it('--taxonomies pointing at an EMPTY directory fails before ingestion', async () => {
+    const empty = path.join(dir, 'empty-taxonomies');
+    await fs.mkdir(empty);
+
+    let caught: unknown;
+    try {
+      await analyzeDataWithDb(config({ taxonomiesPath: empty }), new NeverCalledClient(), true);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(TaxonomyResolutionError);
+    expect((caught as Error).message).toMatch(/directory is empty/);
+    expect((caught as Error).message).toContain(path.resolve(empty));
+    expect(existsSync(path.join(dir, 'pipeline.db'))).toBe(false);
+    expect(existsSync(path.join(dir, 'output.jsonld'))).toBe(false);
+  });
+
+  it('--taxonomies pointing at a directory that lacks a taxonomy the schema references fails with the property name, before ingestion', async () => {
+    // Has *a* taxonomy (so the directory resolves) but not Tier-v1, which person.tier needs.
+    const partial = path.join(dir, 'partial-taxonomies');
+    await fs.mkdir(partial);
+    writeFileSync(
+      path.join(partial, 'Gender-v1.json'),
+      JSON.stringify([{ notation: 'GENDER_OTHER', value: 'other' }])
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    let caught: unknown;
+    try {
+      await analyzeDataWithDb(config({ taxonomiesPath: partial }), new NeverCalledClient(), true);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ConfigurationError);
+    expect(caught).not.toBeInstanceOf(TaxonomyResolutionError);
+    const message = (caught as Error).message;
+    expect(message).toContain('person.tier');
+    expect(message).toContain('Tier-v1');
+    expect(message).toContain(path.join(path.resolve(partial), 'Tier-v1.json'));
+    expect(message).toContain(`explicit (${path.resolve(partial)})`);
+    // a fatal configuration error, not a per-batch failure: nothing was ingested or written
+    expect(existsSync(path.join(dir, 'pipeline.db'))).toBe(false);
+    expect(existsSync(path.join(dir, 'output.jsonld'))).toBe(false);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
 

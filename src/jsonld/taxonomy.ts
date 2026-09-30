@@ -1,7 +1,7 @@
 import path from 'path';
-import { existsSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { createRequire } from 'module';
-import { basePath } from '../utils/index.js';
+import { basePath } from '../utils/file-system.js';
 import { ConfigurationError } from '../utils/errors.js';
 import { JsonLdProperty } from './types.js';
 import { TaxonomyEntry } from './types.js';
@@ -64,9 +64,20 @@ const SOURCE_LABEL: Record<TaxonomySource, string> = {
   vendor: 'vendored fallback (vendor/taxonomies)',
 };
 
+const EMPTY_DIR_REASON = 'directory is empty (no *.json taxonomy files)';
+
 function isDirectory(dir: string): boolean {
   try {
     return statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** A taxonomy directory is only usable when it holds at least one `*.json` file. */
+function hasJsonFiles(dir: string): boolean {
+  try {
+    return readdirSync(dir).some((entry) => entry.toLowerCase().endsWith('.json'));
   } catch {
     return false;
   }
@@ -92,9 +103,10 @@ function defaultVendorDir(): string {
 /**
  * Resolve the directory that holds the taxonomy files.
  *
- * Precedence: explicit path → installed package → vendored fallback.
- * An explicit path that does not exist is a configuration error and is never silently
- * replaced by a lower-precedence source. When nothing resolves, the error lists every
+ * Precedence: explicit path → installed package → vendored fallback. A candidate is accepted
+ * only when it is a directory that contains at least one `*.json` file.
+ * An explicit path that does not exist (or is empty) is a configuration error and is never
+ * silently replaced by a lower-precedence source. When nothing resolves, the error lists every
  * location that was tried.
  */
 export function resolveTaxonomiesDir(
@@ -105,10 +117,14 @@ export function resolveTaxonomiesDir(
 
   if (explicitPath !== undefined && explicitPath !== null && String(explicitPath).trim() !== '') {
     const dir = path.resolve(String(explicitPath));
-    if (isDirectory(dir)) {
+    if (isDirectory(dir) && hasJsonFiles(dir)) {
       return { source: 'explicit', dir, tried };
     }
-    const reason = existsSync(dir) ? 'exists but is not a directory' : 'does not exist';
+    const reason = !existsSync(dir)
+      ? 'does not exist'
+      : !isDirectory(dir)
+        ? 'exists but is not a directory'
+        : EMPTY_DIR_REASON;
     throw new TaxonomyResolutionError(
       `Taxonomies path "${explicitPath}" (resolved to ${dir}) ${reason}. ` +
         `Fix "taxonomiesPath" in the config file or the --taxonomies option, or remove it to use the installed ${ADC_SCHEMA_PACKAGE} package.`,
@@ -122,22 +138,30 @@ export function resolveTaxonomiesDir(
   if (packageRoot) {
     const dir = path.join(packageRoot, 'taxonomies');
     if (isDirectory(dir)) {
-      return { source: 'package', dir, tried };
+      if (hasJsonFiles(dir)) {
+        return { source: 'package', dir, tried };
+      }
+      tried.push({ source: 'package', dir, reason: EMPTY_DIR_REASON });
+    } else {
+      tried.push({
+        source: 'package',
+        dir,
+        reason: 'package is installed but has no taxonomies/ directory',
+      });
     }
-    tried.push({
-      source: 'package',
-      dir,
-      reason: 'package is installed but has no taxonomies/ directory',
-    });
   } else {
     tried.push({ source: 'package', dir: null, reason: 'package is not installed' });
   }
 
   const vendorDir = path.resolve(options.vendorDir ?? defaultVendorDir());
   if (isDirectory(vendorDir)) {
-    return { source: 'vendor', dir: vendorDir, tried };
+    if (hasJsonFiles(vendorDir)) {
+      return { source: 'vendor', dir: vendorDir, tried };
+    }
+    tried.push({ source: 'vendor', dir: vendorDir, reason: EMPTY_DIR_REASON });
+  } else {
+    tried.push({ source: 'vendor', dir: vendorDir, reason: 'does not exist' });
   }
-  tried.push({ source: 'vendor', dir: vendorDir, reason: 'does not exist' });
 
   throw new TaxonomyResolutionError(formatResolutionFailure(tried), tried);
 }
@@ -159,6 +183,8 @@ function formatResolutionFailure(tried: TaxonomyCandidate[]): string {
 
 let activeResolution: TaxonomyResolution | undefined;
 const taxonomyCache: Record<string, TaxonomyEntry[]> = {};
+/** Taxonomy names whose file was not found in the active directory (negative cache). */
+const missingTaxonomies = new Set<string>();
 
 /**
  * Choose the taxonomy directory for this run. Call once, early, with the configured
@@ -201,20 +227,84 @@ export function describeTaxonomySource(
   return `${resolution.source} (${resolution.dir})`;
 }
 
+/** Absolute path of the file that `getTaxonomy(name)` reads from the active directory. */
+export function getTaxonomyFilePath(name: string): string {
+  return path.join(getTaxonomyResolution().dir, `${name}.json`);
+}
+
+/** True when `getTaxonomy(name)` already looked for the file and found nothing. */
+export function isTaxonomyMissing(name: string): boolean {
+  return missingTaxonomies.has(name);
+}
+
+function isTaxonomyEntry(entry: unknown): entry is TaxonomyEntry {
+  return (
+    typeof entry === 'object' &&
+    entry !== null &&
+    typeof (entry as TaxonomyEntry).notation === 'string' &&
+    typeof (entry as TaxonomyEntry).value === 'string'
+  );
+}
+
 /**
- * Load taxonomy data from file with caching
+ * Parse and validate a taxonomy file: it must be a JSON array of `{ notation, value }` objects.
+ */
+function loadTaxonomyFile(filePath: string, source: TaxonomySource): TaxonomyEntry[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(filePath, 'utf-8'));
+  } catch (error) {
+    throw new ConfigurationError(
+      `Taxonomy file ${filePath} (taxonomies source: ${source}) is not valid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      filePath
+    );
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new ConfigurationError(
+      `Taxonomy file ${filePath} (taxonomies source: ${source}) must contain a JSON array of { "notation", "value" } objects, got ${
+        parsed === null ? 'null' : typeof parsed
+      }.`,
+      filePath
+    );
+  }
+
+  const badIndex = parsed.findIndex((entry) => !isTaxonomyEntry(entry));
+  if (badIndex !== -1) {
+    throw new ConfigurationError(
+      `Taxonomy file ${filePath} (taxonomies source: ${source}) is malformed: entry ${badIndex} is not a { "notation": string, "value": string } object (got ${JSON.stringify(
+        parsed[badIndex]
+      )}).`,
+      filePath
+    );
+  }
+
+  return parsed as TaxonomyEntry[];
+}
+
+/**
+ * Load taxonomy data from file with caching.
+ *
+ * A taxonomy whose file is missing yields `[]`; the miss is cached and the warning is emitted
+ * at most once per taxonomy name per configuration. Callers that must not proceed without the
+ * taxonomy (schema `enumFromTaxonomy`) use `handleTaxonomyEnum`, which turns the miss into a
+ * ConfigurationError.
  */
 export function getTaxonomy(name: string): TaxonomyEntry[] {
   if (taxonomyCache[name]) return taxonomyCache[name];
+  if (missingTaxonomies.has(name)) return [];
 
   const { dir, source } = getTaxonomyResolution();
   const filePath = path.join(dir, `${name}.json`);
   if (!existsSync(filePath)) {
+    missingTaxonomies.add(name);
     console.warn(`⚠️ Taxonomy file not found: ${filePath} (taxonomies source: ${source})`);
     return [];
   }
 
-  const data: TaxonomyEntry[] = JSON.parse(readFileSync(filePath, 'utf-8'));
+  const data = loadTaxonomyFile(filePath, source);
   taxonomyCache[name] = data;
   return data;
 }
@@ -223,18 +313,37 @@ export function getTaxonomy(name: string): TaxonomyEntry[] {
  * Handle taxonomy enumeration for properties
  * Note: Do NOT add null to the enum array - OpenAI rejects that!
  * Nullability is handled by the 'nullable: true' property instead.
+ *
+ * A schema property that references a taxonomy which is missing or empty in the resolved
+ * directory is a fatal configuration error: an `enum: []` would make every LLM call fail.
  */
-export function handleTaxonomyEnum(prop: JsonLdProperty): string[] | undefined {
-  if (prop.enumFromTaxonomy) {
-    const taxonomy = getTaxonomy(prop.enumFromTaxonomy);
-    if (!taxonomy) {
-      throw new Error(`Unknown taxonomy: ${prop.enumFromTaxonomy}`);
-    }
-    // Return only the actual enum values, not null
-    const values: string[] = taxonomy.map((t) => t.value);
-    return values;
+export function handleTaxonomyEnum(
+  prop: JsonLdProperty,
+  propertyName?: string
+): string[] | undefined {
+  if (!prop.enumFromTaxonomy) {
+    return undefined;
   }
-  return undefined;
+
+  const taxonomyName = prop.enumFromTaxonomy;
+  const taxonomy = getTaxonomy(taxonomyName);
+  if (taxonomy.length === 0) {
+    const { dir, source } = getTaxonomyResolution();
+    const filePath = path.join(dir, `${taxonomyName}.json`);
+    const property = propertyName ? `Schema property "${propertyName}"` : 'A schema property';
+    const problem = missingTaxonomies.has(taxonomyName)
+      ? `but that file does not exist in the resolved taxonomies directory`
+      : `but that file contains no entries`;
+    throw new ConfigurationError(
+      `${property} uses enumFromTaxonomy "${taxonomyName}" (expected ${filePath}), ${problem}. ` +
+        `Taxonomies source: ${source} (${dir}). ` +
+        `Add ${taxonomyName}.json to that directory, point "taxonomiesPath" / --taxonomies at a directory that has it, or remove the option to use the installed ${ADC_SCHEMA_PACKAGE} package.`,
+      filePath
+    );
+  }
+
+  // Return only the actual enum values, not null
+  return taxonomy.map((t) => t.value);
 }
 
 /**
@@ -242,4 +351,5 @@ export function handleTaxonomyEnum(prop: JsonLdProperty): string[] | undefined {
  */
 export function clearTaxonomyCache(): void {
   Object.keys(taxonomyCache).forEach((key) => delete taxonomyCache[key]);
+  missingTaxonomies.clear();
 }
