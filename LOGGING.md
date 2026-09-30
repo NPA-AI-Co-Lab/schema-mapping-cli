@@ -97,7 +97,7 @@ Validation error with fallback model:
     "attempt": "1/2",
     "errorType": "validation_error",
     "actionTaken": "retry_with_fallback",
-    "fallbackModel": "gpt-4o"
+    "fallbackModel": "gpt-4.1"
   },
   "error_summary": "Batch 2: Zod validation failed: Expected object, received string"
 }
@@ -134,7 +134,7 @@ Rate-limit retry (with wait duration):
 
 - `retry_same` - Retry with same parameters (for API errors)
 - `retry_after_wait` - Rate-limited; waiting for Retry-After duration then retrying (rate-limit retries only)
-- `retry_with_fallback` - Switched to fallback model (e.g., gpt-4o)
+- `retry_with_fallback` - Switched to fallback model (e.g., gpt-4.1)
 - `retry_with_context` - Retrying with error context added to prompt
 - `failed` - Final failure after all retries exhausted
 
