@@ -20,8 +20,8 @@ All other configuration is handled through the `config.json` file for better mai
 
 You can customize the LLM settings in your `config.json`:
 
-- **defaultModel**: Primary model to use (e.g., "gpt-4.1-mini" — the default — "gpt-4.1" or "gpt-4.1-nano"). The tool
-  always sends a `temperature`, so reasoning models that reject it (the gpt-5 and o-series families) are not supported
+- **defaultModel**: Primary model to use (e.g., "gpt-4.1-mini", the default, or "gpt-4.1"). The examples in this README
+  match the CLI's default configuration
 - **fallbackModel**: Backup model when primary fails
 - **temperature**: LLM sampling temperature from `0` to `2`; it now defaults to `0` to keep extraction results more
   stable and reproducible, while still remaining configurable when needed
