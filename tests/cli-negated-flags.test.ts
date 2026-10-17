@@ -48,3 +48,18 @@ describe('--llm-fields / --no-llm-fields parsing', () => {
     expect(opts.noLlmFields).toBe('person.consentType');
   });
 });
+
+describe('--no-adaptive-concurrency parsing', () => {
+  it('sets noAdaptiveConcurrency when the flag is given', () => {
+    const opts = parseAnalyzeOptions(['--no-adaptive-concurrency']);
+
+    expect(opts.noAdaptiveConcurrency).toBe(true);
+  });
+
+  it('leaves noAdaptiveConcurrency unset when the flag is absent, so the config value wins', () => {
+    const opts = parseAnalyzeOptions([]);
+
+    expect(opts.noAdaptiveConcurrency).toBeUndefined();
+    expect('adaptiveConcurrency' in opts).toBe(false);
+  });
+});
