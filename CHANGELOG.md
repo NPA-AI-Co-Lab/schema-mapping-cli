@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Fixed
+
+- `--no-llm-fields <fields>` now keeps the listed fields deterministic, as documented. Commander treated the `--no-` prefix as the negated form of `--llm-fields`, so the value was stored under `llmFields` and the listed fields were forced *through* the LLM instead of away from it; `noLlmFields` was never set. The option is now registered as a standalone value option. Tests: `tests/cli-llm-field-flags.test.ts`
+
 ## [2.3.0] - 2026-09-24
 
 The Audience Data Commons data model moves out of this repository into its own standard,

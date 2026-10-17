@@ -1,6 +1,20 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { CliOptions, PackageInfo } from './cli-types.js';
 import { runAnalyzeCommand } from './cli-commands.js';
+
+/**
+ * `--no-llm-fields <fields>` is its own option, not the negated form of `--llm-fields`.
+ * Commander treats any `--no-` prefix as a negation by default, which would store the value
+ * under `llmFields` (forcing the listed fields *through* the LLM) and never set `noLlmFields`.
+ */
+function noLlmFieldsOption(): Option {
+  const option = new Option(
+    '--no-llm-fields <fields>',
+    'Comma-separated list of fields to keep deterministic'
+  );
+  option.negate = false;
+  return option;
+}
 
 /**
  * Setup and configure the CLI program with commands and options
@@ -30,7 +44,7 @@ export function setupCliProgram(program: Command, pkg: PackageInfo) {
     .option('--model <name>', 'LLM model name (e.g., gpt-4.1-mini)')
     .option('--fallback-model <name>', 'Fallback LLM model name')
     .option('--llm-fields <fields>', 'Comma-separated list of fields to resolve via LLM')
-    .option('--no-llm-fields <fields>', 'Comma-separated list of fields to keep deterministic')
+    .addOption(noLlmFieldsOption())
     .option('--logging', 'Enable detailed logging')
     .option('--hide-pii', 'Enable PII protection')
     .option('--required-fields-fail-batch', 'Fail entire batch on required field errors')
