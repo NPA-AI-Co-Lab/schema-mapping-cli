@@ -1,6 +1,22 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { CliOptions, PackageInfo } from './cli-types.js';
 import { runAnalyzeCommand } from './cli-commands.js';
+
+/**
+ * A `--no-…` flag that is its own option rather than the negated form of a positive one.
+ *
+ * Commander treats any `--no-` prefix as a negation by default. For `--no-llm-fields <fields>`
+ * that stored the value under `llmFields` (forcing the listed fields *through* the LLM) and never
+ * set `noLlmFields`. For `--no-adaptive-concurrency` it set `adaptiveConcurrency: false` (and
+ * `true` by default even when the flag was absent) while the CLI reads `noAdaptiveConcurrency`,
+ * so the flag was ignored. With `negate` off the value lands under `noLlmFields` /
+ * `noAdaptiveConcurrency` and is undefined when the flag is not given, so the config file wins.
+ */
+function standaloneNoOption(flags: string, description: string): Option {
+  const option = new Option(flags, description);
+  option.negate = false;
+  return option;
+}
 
 /**
  * Setup and configure the CLI program with commands and options
@@ -30,7 +46,12 @@ export function setupCliProgram(program: Command, pkg: PackageInfo) {
     .option('--model <name>', 'LLM model name (e.g., gpt-4.1-mini)')
     .option('--fallback-model <name>', 'Fallback LLM model name')
     .option('--llm-fields <fields>', 'Comma-separated list of fields to resolve via LLM')
-    .option('--no-llm-fields <fields>', 'Comma-separated list of fields to keep deterministic')
+    .addOption(
+      standaloneNoOption(
+        '--no-llm-fields <fields>',
+        'Comma-separated list of fields to keep deterministic'
+      )
+    )
     .option('--logging', 'Enable detailed logging')
     .option('--hide-pii', 'Enable PII protection')
     .option('--required-fields-fail-batch', 'Fail entire batch on required field errors')
@@ -39,7 +60,9 @@ export function setupCliProgram(program: Command, pkg: PackageInfo) {
     .option('--rate-limit-retries <n>', 'Extra retries for rate-limit errors (0-20)')
     .option('--rate-limit-max-wait <ms>', 'Upper bound for Retry-After wait in ms (1000-600000)')
     .option('--sdk-retries <n>', 'OpenAI SDK retry count (0-5)')
-    .option('--no-adaptive-concurrency', 'Disable adaptive concurrency halving')
+    .addOption(
+      standaloneNoOption('--no-adaptive-concurrency', 'Disable adaptive concurrency halving')
+    )
     .option('--fail-fast', 'Abort on first failed batch')
     .action((options: CliOptions) => runAnalyzeCommand(options, pkg));
 

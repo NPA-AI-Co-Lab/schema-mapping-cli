@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Fixed
+
+- `--no-llm-fields <fields>` now keeps the listed fields deterministic, as documented. Commander treated the `--no-` prefix as the negated form of `--llm-fields`, so the value was stored under `llmFields` and the listed fields were forced *through* the LLM instead of away from it; `noLlmFields` was never set. The option is now registered as a standalone value option. Tests: `tests/cli-negated-flags.test.ts`
+- `--no-adaptive-concurrency` is no longer ignored. Commander parsed it as the negation of a (non-existent) `--adaptive-concurrency`, storing `adaptiveConcurrency: false` — and `true` by default even when the flag was absent — while the CLI reads `noAdaptiveConcurrency`, so the config file value always won. The flag is now a standalone option that is undefined unless given, so passing it disables adaptive concurrency and omitting it leaves the config value in effect. Tests: `tests/cli-negated-flags.test.ts`
+
 ## [2.3.0] - 2026-09-24
 
 The Audience Data Commons data model moves out of this repository into its own standard,
