@@ -8,6 +8,23 @@ import {
 } from '../interfaces/llm-client.interface.js';
 import { normalizeLLMError } from './llm-errors.js';
 
+/** Reasoning models (o-series, gpt-5 and gpt-6 families) reject `temperature` while reasoning is on. */
+const REASONING_MODEL = /^(o\d|gpt-5|gpt-6)/i;
+/** Reasoning models that accept `reasoning.effort: 'none'` (checked against the API in October 2026). */
+const REASONING_OFF_MODEL = /^(gpt-5\.\d|gpt-6-(sol|luna))/i;
+
+/**
+ * Sampling parameters for a Responses API request. Classic models get `temperature`. Reasoning models that can
+ * turn reasoning off get `effort: 'none'` plus `temperature`, which keeps extraction fast and deterministic.
+ * The remaining reasoning models (gpt-5, gpt-5-mini, gpt-6-astra, gpt-6.1-sol, o-series) are called with
+ * their default settings, because they reject both.
+ */
+export function samplingParams(model: string, temperature: number): Record<string, unknown> {
+  if (!REASONING_MODEL.test(model)) return { temperature };
+  if (REASONING_OFF_MODEL.test(model)) return { reasoning: { effort: 'none' }, temperature };
+  return {};
+}
+
 /**
  * OpenAI implementation of the LLM client interface
  */
@@ -41,11 +58,11 @@ export class OpenAILLMClient implements ILLMClient {
         model: request.model,
         instructions: request.instructions,
         input: request.input,
-        temperature: request.temperature ?? 0,
+        ...samplingParams(request.model, request.temperature ?? 0),
         text: {
           format: zodTextFormat(request.zodSchema, 'entities'),
         },
-      });
+      } as OpenAI.Responses.ResponseCreateParamsNonStreaming);
 
       if (response.error) {
         const error = new Error(`OpenAI API error: ${response.error.message}`) as LLMError;

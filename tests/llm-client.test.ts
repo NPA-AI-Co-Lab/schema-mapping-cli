@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { OpenAILLMClient } from '../src/clients/openai-llm-client.js';
+import { OpenAILLMClient, samplingParams } from '../src/clients/openai-llm-client.js';
 import { LLMClientFactory } from '../src/clients/llm-client-factory.js';
 import { LLMRequestError } from '../src/clients/llm-errors.js';
 import type { LLMAnalysisRequest } from '../src/interfaces/llm-client.interface.js';
@@ -240,6 +240,41 @@ describe('LLM Client', () => {
 
       await expect(client.analyze(request)).rejects.toThrow();
     });
+
+    it('should turn reasoning off and keep temperature for gpt-6-luna', async () => {
+      mockOpenAI.responses.create.mockResolvedValue({ output_text: '{}', error: null });
+
+      await client.analyze({
+        model: 'gpt-6-luna',
+        instructions: 'Extract entities',
+        input: [{ role: 'user', content: 'Test data' }],
+        zodSchema: z.object({}),
+      });
+
+      expect(mockOpenAI.responses.create).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'gpt-6-luna', reasoning: { effort: 'none' }, temperature: 0 })
+      );
+    });
+  });
+
+  describe('samplingParams', () => {
+    it.each(['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o'])('sends only temperature to %s', (model) => {
+      expect(samplingParams(model, 0.3)).toEqual({ temperature: 0.3 });
+    });
+
+    it.each(['gpt-6-luna', 'gpt-6-sol', 'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-5.1'])(
+      'turns reasoning off for %s',
+      (model) => {
+        expect(samplingParams(model, 0)).toEqual({ reasoning: { effort: 'none' }, temperature: 0 });
+      }
+    );
+
+    it.each(['gpt-6-astra', 'gpt-6.1-sol', 'gpt-5', 'gpt-5-mini', 'o3', 'o4-mini'])(
+      'sends neither temperature nor reasoning effort to %s',
+      (model) => {
+        expect(samplingParams(model, 0)).toEqual({});
+      }
+    );
   });
 
   describe('LLMClientFactory', () => {

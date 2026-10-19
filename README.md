@@ -20,8 +20,10 @@ All other configuration is handled through the `config.json` file for better mai
 
 You can customize the LLM settings in your `config.json`:
 
-- **defaultModel**: Primary model to use (e.g., "gpt-4.1-mini", the default, or "gpt-4.1"). The examples in this README
-  match the CLI's default configuration
+- **defaultModel**: Primary model to use (e.g., "gpt-6-luna", recommended for extraction, or "gpt-6-sol"). Without this
+  setting the CLI uses "gpt-4.1-mini". For gpt-6-luna, gpt-6-sol and the gpt-5.x models the CLI turns reasoning off, so
+  `temperature` still applies; models that cannot turn it off (gpt-6-astra, gpt-6.1-sol, gpt-5, o-series) run with their
+  default reasoning and without `temperature`
 - **fallbackModel**: Backup model when primary fails
 - **temperature**: LLM sampling temperature from `0` to `2`; it now defaults to `0` to keep extraction results more
   stable and reproducible, while still remaining configurable when needed
@@ -96,8 +98,8 @@ Create a configuration file (`config.json`) with your data and schema paths:
   "requiredFieldErrorsFailBatch": false,
   "batchSize": 5,
   "concurrencySize": 5,
-  "defaultModel": "gpt-4.1-mini",
-  "fallbackModel": "gpt-4.1",
+  "defaultModel": "gpt-6-luna",
+  "fallbackModel": "gpt-6-sol",
   "temperature": 0,
   "uuidColumn": "primaryEmail",
   "rulesPath": "./config/sample_comments.rules.json",
@@ -155,7 +157,7 @@ New OpenAI accounts are subject to per-minute and per-day rate limits (tokens/mi
 - **Concurrency:** 2 (down from typical 5-20)
 - **Rate-limit retries:** 8 (up from default 6, up to ~2 minutes per wait)
 - **Rate-limit max wait:** 120000ms (2 minutes, vs default 90 seconds)
-- **Models:** `gpt-4.1-mini` for both default and fallback (not `gpt-4.1`, the regular fallback, which has lower rate limits on new accounts)
+- **Models:** `gpt-6-luna` for both default and fallback (no escalation to a bigger model, which has lower rate limits on new accounts)
 
 Customize `dataPaths` and other paths to match your data, or pass settings via CLI:
 

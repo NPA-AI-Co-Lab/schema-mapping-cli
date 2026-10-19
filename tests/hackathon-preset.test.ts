@@ -33,7 +33,7 @@ describe('config/hackathon.config.json', () => {
     expect(normalized.adaptiveConcurrency).toBe(true);
     expect(normalized.failFast).toBe(false);
     expect(normalized.sdkMaxRetries).toBe(0);
-    expect(normalized.defaultModel).toBe('gpt-4.1-mini');
+    expect(normalized.defaultModel).toBe('gpt-6-luna');
     // No escalation to a bigger (lower-TPM) model on validation retries
     expect(normalized.fallbackModel).toBe(normalized.defaultModel);
   });
