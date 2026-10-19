@@ -36,7 +36,7 @@ The tool supports multiple LLM providers through a pluggable client architecture
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 20 or higher (CI runs on Node 22)
 - An OpenAI API key is required only for the AI path (fields listed under `llm.fields` in your rules file). Rules-only runs need no key. See [Deterministic rules file](#deterministic-rules-file) for how to write a rules file where every field is determined without LLM calls.
 
 ## Installation
@@ -44,8 +44,8 @@ The tool supports multiple LLM providers through a pluggable client architecture
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/<REPO_NAME>/npa-ingest-insight-cli.git
-cd npa-ingest-insight-cli
+git clone https://github.com/NPA-AI-Co-Lab/schema-mapping-cli.git
+cd schema-mapping-cli
 ```
 
 2. Install dependencies (this also installs `@npa-ai-co-lab/adc-schema`, the package that carries the ADC schema and taxonomies — see [ADC schema and taxonomies](#adc-schema-and-taxonomies)):
@@ -65,7 +65,8 @@ export OPENAI_API_KEY="your-api-key-here"
 **Option B: .env file**
 
 ```bash
-# Edit the .env file and add your API key
+cp .env.example .env
+# then set your key in .env:
 OPENAI_API_KEY=your-api-key-here
 ```
 
@@ -162,9 +163,9 @@ New OpenAI accounts are subject to per-minute and per-day rate limits (tokens/mi
 Customize `dataPaths` and other paths to match your data, or pass settings via CLI:
 
 ```bash
-npm run start analyze --config config/hackathon.config.json
+npm run start -- analyze --config config/hackathon.config.json
 # or customize inline:
-npm run start analyze --config config.json --concurrency 2 --rate-limit-retries 8
+npm run start -- analyze --config config.json --concurrency 2 --rate-limit-retries 8
 ```
 
 ### Multi-File Processing
@@ -230,7 +231,7 @@ When batch processing fails (due to rate limits, validation errors, or other iss
 To resume processing after a failure, **re-run the same command:**
 
 ```bash
-npm run start analyze --config config.json
+npm run start -- analyze --config config.json
 ```
 
 The CLI will:
@@ -589,14 +590,14 @@ For details on linting configuration, please refer to [typescript-eslint](https:
 
 ### Testing
 
-The project includes a comprehensive test suite with 100% coverage across all core functionality:
+The project includes a test suite covering the core functionality:
 
 ```bash
-# Run all tests
-npm test
+# Run all tests once
+npx vitest run
 
 # Run tests in watch mode
-npm run test:watch
+npm test
 
 # Run tests with coverage report
 npm run test:coverage
@@ -618,9 +619,9 @@ npm run test:coverage
 │   ├── analysis/           # Analysis and processing logic
 │   ├── cli/                # Modular CLI components
 │   ├── clients/            # LLM client implementations
-│   │   └── openai-client.ts # OpenAI client implementation
+│   │   └── openai-llm-client.ts # OpenAI client implementation
 │   ├── interfaces/         # Type definitions and contracts
-│   │   └── llm-client.ts   # LLM client interface
+│   │   └── llm-client.interface.ts # LLM client interface
 │   ├── types/           # Type definitions
 │   ├── jsonld/          # input/output files processing
 │   ├── utils/              # Utility functions
@@ -636,7 +637,7 @@ npm run test:coverage
 │   └── taxonomies/         # Pinned copy of the ADC taxonomies: offline fallback of the resolver
 ├── scripts/                # Maintenance scripts (vendor:sync / vendor:check)
 ├── .github/workflows/      # CI: build, vendor:check, tests
-├── .env                    # Contains global constants
+├── .env.example            # Template for .env (OPENAI_API_KEY)
 ├── config.json             # Example config
 ├── CHANGELOG.md
 └── README.md
