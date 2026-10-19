@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Default models are now `gpt-6-luna` (default) and `gpt-6-sol` (fallback) instead of `gpt-4.1-mini` / `gpt-4.1`. GPT-6 and GPT-5.x models are supported: the client turns reasoning off where the model allows it, so `temperature` still applies, and omits `temperature` for models that reject it. The README and the hackathon preset use GPT-6.
+
 ### Fixed
 
+- A config file without `defaultModel` / `fallbackModel` no longer sends requests with no model (400 "Missing required parameter: 'model'") in CLI mode; the documented defaults now apply.
 - `--no-llm-fields <fields>` now keeps the listed fields deterministic, as documented. Commander treated the `--no-` prefix as the negated form of `--llm-fields`, so the value was stored under `llmFields` and the listed fields were forced *through* the LLM instead of away from it; `noLlmFields` was never set. The option is now registered as a standalone value option. Tests: `tests/cli-negated-flags.test.ts`
 - `--no-adaptive-concurrency` is no longer ignored. Commander parsed it as the negation of a (non-existent) `--adaptive-concurrency`, storing `adaptiveConcurrency: false` — and `true` by default even when the flag was absent — while the CLI reads `noAdaptiveConcurrency`, so the config file value always won. The flag is now a standalone option that is undefined unless given, so passing it disables adaptive concurrency and omitting it leaves the config value in effect. Tests: `tests/cli-negated-flags.test.ts`
 

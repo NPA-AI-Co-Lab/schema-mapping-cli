@@ -4,6 +4,8 @@ import {
   bold,
   getAppParams,
   getAppParamsFromConfig,
+  getDefaultModel,
+  getFallbackModel,
   loadBaseAppConfig,
   removeCliSigintHandler,
   restoreCliSigintHandler,
@@ -183,8 +185,8 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     concurrencySize: options.concurrency
       ? parseInt(options.concurrency, 10)
       : baseConfig.concurrencySize,
-    defaultModel: options.model || baseConfig.defaultModel,
-    fallbackModel: options.fallbackModel || baseConfig.fallbackModel,
+    defaultModel: options.model || getDefaultModel(baseConfig),
+    fallbackModel: options.fallbackModel || getFallbackModel(baseConfig),
     uuidColumn: baseConfig.uuidColumn,
     rulesPath: options.rules || baseConfig.rulesPath,
     taxonomiesPath: options.taxonomies || baseConfig.taxonomiesPath,

@@ -43,7 +43,7 @@ export function setupCliProgram(program: Command, pkg: PackageInfo) {
     .option('--batch-size <number>', 'Number of records per batch (1-50)')
     .option('--concurrency <number>', 'Number of concurrent requests (1-20)')
     .option('--retries <number>', 'Number of retry attempts (0-10)')
-    .option('--model <name>', 'LLM model name (e.g., gpt-4.1-mini)')
+    .option('--model <name>', 'LLM model name (default gpt-6-luna)')
     .option('--fallback-model <name>', 'Fallback LLM model name')
     .option('--llm-fields <fields>', 'Comma-separated list of fields to resolve via LLM')
     .addOption(
@@ -78,7 +78,7 @@ Examples:
   ${pkg.name} analyze -c config.json
 
   # Override config with CLI options
-  ${pkg.name} analyze -c config.json --batch-size 10 --model gpt-4.1
+  ${pkg.name} analyze -c config.json --batch-size 10 --model gpt-6-sol
 
   # Run with deterministic rules and no LLM fields
   ${pkg.name} analyze -c config.json --rules ./config/sample_comments.rules.json

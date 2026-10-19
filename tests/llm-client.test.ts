@@ -252,7 +252,11 @@ describe('LLM Client', () => {
       });
 
       expect(mockOpenAI.responses.create).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gpt-6-luna', reasoning: { effort: 'none' }, temperature: 0 })
+        expect.objectContaining({
+          model: 'gpt-6-luna',
+          reasoning: { effort: 'none' },
+          temperature: 0,
+        })
       );
     });
   });
@@ -419,8 +423,8 @@ describe('LLM Client', () => {
 
       // Should not throw type errors
       expect(client.analyze).toBeDefined();
-      expect(client.getDefaultModel()).toBe('gpt-4.1'); // default value
-      expect(client.getFallbackModel()).toBe('gpt-4.1'); // default value
+      expect(client.getDefaultModel()).toBe('gpt-6-luna'); // default value
+      expect(client.getFallbackModel()).toBe('gpt-6-sol'); // default value
     });
   });
 });

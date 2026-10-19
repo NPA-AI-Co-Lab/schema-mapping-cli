@@ -35,8 +35,8 @@ export class OpenAILLMClient implements ILLMClient {
 
   constructor(
     apiKey: string,
-    defaultModel: string = 'gpt-4.1',
-    fallbackModel: string = 'gpt-4.1',
+    defaultModel: string = 'gpt-6-luna',
+    fallbackModel: string = 'gpt-6-sol',
     options?: { maxRetries?: number; timeoutMs?: number }
   ) {
     if (!apiKey) {

@@ -21,7 +21,7 @@ All other configuration is handled through the `config.json` file for better mai
 You can customize the LLM settings in your `config.json`:
 
 - **defaultModel**: Primary model to use (e.g., "gpt-6-luna", recommended for extraction, or "gpt-6-sol"). Without this
-  setting the CLI uses "gpt-4.1-mini". For gpt-6-luna, gpt-6-sol and the gpt-5.x models the CLI turns reasoning off, so
+  setting the CLI uses "gpt-6-luna" (fallback "gpt-6-sol"). For gpt-6-luna, gpt-6-sol and the gpt-5.x models the CLI turns reasoning off, so
   `temperature` still applies; models that cannot turn it off (gpt-6-astra, gpt-6.1-sol, gpt-5, o-series) run with their
   default reasoning and without `temperature`
 - **fallbackModel**: Backup model when primary fails

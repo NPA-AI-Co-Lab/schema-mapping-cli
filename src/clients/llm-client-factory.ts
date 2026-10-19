@@ -48,8 +48,8 @@ export class LLMClientFactory {
     return LLMClientFactory.create({
       provider,
       apiKey,
-      defaultModel: process.env.DEFAULT_MODEL || 'gpt-4.1',
-      fallbackModel: process.env.FALLBACK_MODEL || 'gpt-4.1',
+      defaultModel: process.env.DEFAULT_MODEL || 'gpt-6-luna',
+      fallbackModel: process.env.FALLBACK_MODEL || 'gpt-6-sol',
       maxRetries,
     });
   }

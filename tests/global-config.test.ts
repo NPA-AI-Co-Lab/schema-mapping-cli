@@ -13,8 +13,8 @@ describe('loadGlobalConfig', () => {
     expect(cfg).toEqual({
       BATCH_SIZE: 5,
       CONC_SIZE: 5,
-      DEFAULT_MODEL: 'gpt-4.1-mini',
-      FALLBACK_MODEL: 'gpt-4.1',
+      DEFAULT_MODEL: 'gpt-6-luna',
+      FALLBACK_MODEL: 'gpt-6-sol',
     });
   });
 });

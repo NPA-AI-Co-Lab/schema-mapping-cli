@@ -38,8 +38,8 @@ export function getDefaultAppConfig(): AppConfig {
     requiredFieldErrorsFailBatch: false,
     batchSize: 5,
     concurrencySize: 5,
-    defaultModel: 'gpt-4.1-mini',
-    fallbackModel: 'gpt-4.1-mini',
+    defaultModel: 'gpt-6-luna',
+    fallbackModel: 'gpt-6-sol',
     temperature: 0,
     resumeMode: 'auto',
   };
@@ -75,8 +75,8 @@ export function loadGlobalConfig(configPath?: string) {
   return {
     BATCH_SIZE: config.batchSize ?? 5,
     CONC_SIZE: config.concurrencySize ?? 5,
-    DEFAULT_MODEL: config.defaultModel ?? 'gpt-4.1-mini',
-    FALLBACK_MODEL: config.fallbackModel ?? 'gpt-4.1',
+    DEFAULT_MODEL: config.defaultModel ?? 'gpt-6-luna',
+    FALLBACK_MODEL: config.fallbackModel ?? 'gpt-6-sol',
   };
 }
 
@@ -98,14 +98,14 @@ export function getConcurrencySize(config?: AppConfig): number {
  * Get default model from configuration
  */
 export function getDefaultModel(config?: AppConfig): string {
-  return config?.defaultModel ?? 'gpt-4.1-mini';
+  return config?.defaultModel ?? 'gpt-6-luna';
 }
 
 /**
  * Get fallback model from configuration
  */
 export function getFallbackModel(config?: AppConfig): string {
-  return config?.fallbackModel ?? 'gpt-4.1';
+  return config?.fallbackModel ?? 'gpt-6-sol';
 }
 
 /**
