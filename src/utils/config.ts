@@ -3,6 +3,11 @@ import { EnvConfig, AppConfig } from './types.js';
 import { loadJSON } from './file-system.js';
 import path from 'path';
 import fs from 'fs';
+import {
+  providerDefaultModels,
+  providerKeyEnvVar,
+  resolveProviderFromEnv,
+} from '../clients/llm-provider.js';
 
 dotenv.config({ quiet: true });
 
@@ -12,6 +17,8 @@ dotenv.config({ quiet: true });
 export function loadEnvConfig(): EnvConfig {
   return {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    LLM_PROVIDER: process.env.LLM_PROVIDER,
   };
 }
 
@@ -98,14 +105,21 @@ export function getConcurrencySize(config?: AppConfig): number {
  * Get default model from configuration
  */
 export function getDefaultModel(config?: AppConfig): string {
-  return config?.defaultModel ?? 'gpt-6-luna';
+  return config?.defaultModel ?? providerDefaultModels(resolveProviderFromEnv()).defaultModel;
 }
 
 /**
  * Get fallback model from configuration
  */
 export function getFallbackModel(config?: AppConfig): string {
-  return config?.fallbackModel ?? 'gpt-6-sol';
+  return config?.fallbackModel ?? providerDefaultModels(resolveProviderFromEnv()).fallbackModel;
+}
+
+/**
+ * Check whether an API key for the active LLM provider is configured
+ */
+export function isLLMConfigured(): boolean {
+  return !!process.env[providerKeyEnvVar(resolveProviderFromEnv())];
 }
 
 /**

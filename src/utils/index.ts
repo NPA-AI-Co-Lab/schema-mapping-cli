@@ -10,6 +10,7 @@ export {
   getFallbackModel,
   isOpenAIConfigured,
   getOpenAIAPIKey,
+  isLLMConfigured,
 } from './config.js';
 
 export { validateConfigPaths } from './config-path-validator.js';

@@ -3,8 +3,12 @@
  * Only contains sensitive credentials.
  */
 export interface EnvConfig {
-  /** OpenAI API key for authentication */
+  /** OpenAI API key (used when the provider is OpenAI) */
   OPENAI_API_KEY?: string;
+  /** Anthropic API key (used when the provider is Anthropic / Claude) */
+  ANTHROPIC_API_KEY?: string;
+  /** Force the provider: `openai` or `anthropic`. Defaults to whichever key is set (OpenAI first). */
+  LLM_PROVIDER?: string;
 }
 
 /**
@@ -52,7 +56,7 @@ export interface AppConfig {
   rateLimitMaxRetries?: number;
   /** Upper bound in ms for a single Retry-After wait (default 90000) */
   rateLimitMaxWaitMs?: number;
-  /** OpenAI SDK built-in retry count (default 0 — the CLI's own retry layer already handles 429/5xx/connection errors and needs to see 429s promptly to pause other batches; max 5) */
+  /** LLM SDK built-in retry count (default 0 — the CLI's own retry layer already handles 429/5xx/connection errors and needs to see 429s promptly to pause other batches; max 5) */
   sdkMaxRetries?: number;
   /** Halve concurrency after repeated rate limits and ramp back on success (default true) */
   adaptiveConcurrency?: boolean;

@@ -210,7 +210,7 @@ export async function runWithRetries(
       }
 
       warn(
-        `Rate limited by OpenAI — waiting ${Math.round(wait / 1000)}s (attempt ${rateLimitAttempts}/${rateLimitMaxRetries})`,
+        `Rate limited by the LLM API — waiting ${Math.round(wait / 1000)}s (attempt ${rateLimitAttempts}/${rateLimitMaxRetries})`,
         spinner
       );
 

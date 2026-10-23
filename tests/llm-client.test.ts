@@ -285,6 +285,7 @@ describe('LLM Client', () => {
     beforeEach(() => {
       vi.clearAllMocks();
       delete process.env.OPENAI_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
       delete process.env.LLM_PROVIDER;
     });
 
@@ -345,9 +346,15 @@ describe('LLM Client', () => {
       const openaiClient = LLMClientFactory.createFromEnv();
       expect(openaiClient).toBeInstanceOf(OpenAILLMClient);
 
-      // Factory should be extensible for other providers
+      // Forcing Anthropic without its key names the missing variable
       expect(() => {
         process.env.LLM_PROVIDER = 'anthropic';
+        LLMClientFactory.createFromEnv();
+      }).toThrow('ANTHROPIC_API_KEY environment variable is required');
+
+      // Unknown providers are rejected
+      expect(() => {
+        process.env.LLM_PROVIDER = 'gemini';
         LLMClientFactory.createFromEnv();
       }).toThrow('Unsupported LLM provider');
     });

@@ -8,7 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Anthropic (Claude) as a second LLM provider. Set `ANTHROPIC_API_KEY` instead of `OPENAI_API_KEY` and the CLI uses Claude with `claude-sonnet-5-5` as the default model and `claude-haiku-5-5` as the fallback; set `LLM_PROVIDER=openai|anthropic` to force a provider when both keys are present. Claude requests use structured outputs with the same schema as the OpenAI path, ask for low effort, and never send `temperature` (Claude 5.x models reject it, so the `temperature` setting has no effect with this provider). Sample config: `config/claude.config.json`. Tests: `tests/anthropic-llm-client.test.ts`, `tests/llm-provider.test.ts`
+
 ### Changed
+
+- The missing-API-key error, the rate-limit log line and the `--sdk-retries` help text no longer assume OpenAI; `OPENAI_MAX_RETRIES` has an `ANTHROPIC_MAX_RETRIES` counterpart.
 
 - Default models are now `gpt-6-luna` (default) and `gpt-6-sol` (fallback) instead of `gpt-4.1-mini` / `gpt-4.1`. GPT-6 and GPT-5.x models are supported: the client turns reasoning off where the model allows it, so `temperature` still applies, and omits `temperature` for models that reject it. The README and the hackathon preset use GPT-6.
 

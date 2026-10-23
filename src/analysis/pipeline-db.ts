@@ -8,6 +8,11 @@ import { existsSync } from 'fs';
 import ora, { Ora } from 'ora';
 import { convertJsonSchemaToZod } from 'zod-from-json-schema';
 import { resolveRefs } from 'json-refs';
+import {
+  providerDisplayName,
+  providerKeyEnvVar,
+  resolveProviderFromEnv,
+} from '../clients/llm-provider.js';
 import pLimit from 'p-limit';
 import { ZodError, ZodTypeAny } from 'zod';
 
@@ -453,17 +458,28 @@ export async function analyzeDataWithDb(
     // Setup LLM client. An explicitly-provided client (tests / programmatic callers) is
     // used as-is; otherwise the client is created lazily from the environment, memoised
     // across batches, and only when a batch actually needs it — so runs where every row
-    // is resolved deterministically never require OPENAI_API_KEY to be set. Either way,
+    // is resolved deterministically never require an LLM API key to be set. Either way,
     // the client handed to batches is wrapped in a ThrottledLLMClient bound to this run's
     // gate, memoised alongside it so the wrap only happens once.
     let client = llmClient;
     let throttledClient: ILLMClient | undefined;
     const getClient = (fieldListForBatch: string[]): ILLMClient => {
       if (!client) {
-        if (!process.env.OPENAI_API_KEY) {
+        let provider;
+        try {
+          provider = resolveProviderFromEnv();
+        } catch (error) {
+          throw new ConfigurationError((error as Error).message);
+        }
+        const keyEnvVar = providerKeyEnvVar(provider);
+        if (!process.env[keyEnvVar]) {
+          const alternative =
+            provider === 'openai'
+              ? ' (or ANTHROPIC_API_KEY to use Claude)'
+              : ' (or OPENAI_API_KEY to use OpenAI)';
           throw new ConfigurationError(
-            `This run needs OpenAI for fields [${fieldListForBatch.join(', ')}] but OPENAI_API_KEY is not set. ` +
-              'Set the key, or keep these fields deterministic via rules / --no-llm-fields.'
+            `This run needs ${providerDisplayName(provider)} for fields [${fieldListForBatch.join(', ')}] but ${keyEnvVar} is not set. ` +
+              `Set the key${alternative}, or keep these fields deterministic via rules / --no-llm-fields.`
           );
         }
         client = LLMClientFactory.createFromEnv({ maxRetries: sdkMaxRetries });

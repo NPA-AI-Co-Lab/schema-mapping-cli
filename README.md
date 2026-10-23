@@ -8,11 +8,16 @@ The tool features a modular architecture with pluggable LLM providers, making it
 
 ### Environment Variables
 
-The application uses a `.env` file for sensitive credentials only:
+The application uses a `.env` file for sensitive credentials only. Set the key for the provider you want to use:
 
 ```bash
-OPENAI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key_here      # OpenAI (GPT models)
+# or
+ANTHROPIC_API_KEY=your_api_key_here   # Anthropic (Claude models)
 ```
+
+The CLI uses OpenAI when `OPENAI_API_KEY` is set and Claude when only `ANTHROPIC_API_KEY` is set. If both are set,
+OpenAI wins unless `LLM_PROVIDER=anthropic` (or `openai`) forces the choice.
 
 All other configuration is handled through the `config.json` file for better maintainability and deployment flexibility.
 
@@ -32,7 +37,28 @@ You can customize the LLM settings in your `config.json`:
 - **batchSize**: Number of records per API request (1-50)
 - **concurrencySize**: Concurrent API requests (1-20)
 
-The tool supports multiple LLM providers through a pluggable client architecture. Currently supports OpenAI, with easy extensibility for other providers.
+The tool supports multiple LLM providers through a pluggable client architecture. OpenAI and Anthropic (Claude) are
+built in; see [Using Claude](#using-claude-anthropic).
+
+### Using Claude (Anthropic)
+
+Set `ANTHROPIC_API_KEY` (and no `OPENAI_API_KEY`, or `LLM_PROVIDER=anthropic` if both are set). Without
+`defaultModel` / `fallbackModel` in the config the CLI uses `claude-sonnet-5-5` with `claude-haiku-5-5` as the
+fallback. A config written for OpenAI that names GPT models must be changed to Claude models, or the run stops with a
+clear error before any request is sent. A ready-made sample is `config/claude.config.json`:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run start -- analyze --config config/claude.config.json
+```
+
+Differences from the OpenAI path:
+
+- Claude requests use Anthropic's structured outputs with the same JSON schema, ask for `effort: low` (fast and cheap,
+  which is right for bulk extraction), and leave thinking at the model default.
+- `temperature` is **not** sent: Claude 5.x models reject it, so the `temperature` setting has no effect with this
+  provider.
+- `ANTHROPIC_MAX_RETRIES` is the counterpart of `OPENAI_MAX_RETRIES`; `--sdk-retries` applies to both.
+- Rate limits (429) and overloaded responses (529) go through the same pause-and-retry logic as OpenAI 429s.
 
 ## Prerequisites
 
@@ -54,7 +80,8 @@ cd schema-mapping-cli
 npm install
 ```
 
-3. Set up your LLM API key (skip if running in rules-only mode). Choose one method to provide your OpenAI API key:
+3. Set up your LLM API key (skip if running in rules-only mode). Choose one method to provide your OpenAI or
+   Anthropic API key (use `ANTHROPIC_API_KEY` in place of `OPENAI_API_KEY` to run on Claude):
 
 **Option A: Environment Variable**
 
@@ -296,7 +323,7 @@ Deterministic behaviour can be tuned per run:
 - `--no-llm-fields field1,field2` – keep the listed paths deterministic for this run.
 - `--taxonomies <dir>` – resolve taxonomy enums from this directory instead of the installed `@npa-ai-co-lab/adc-schema` package (or the vendored fallback). Same effect as `taxonomiesPath` in the config file; the flag wins when both are set.
 
-With a complete rules file you can run the CLI without an `OPENAI_API_KEY`; the pipeline skips LLM calls when every row is satisfied deterministically.
+With a complete rules file you can run the CLI without an API key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`); the pipeline skips LLM calls when every row is satisfied deterministically.
 
 ### ADC schema and taxonomies
 
@@ -522,7 +549,9 @@ There are several ways to enforce rules onto the fields of your schema. Most imp
 
 The application uses a `.env` file for configuration. Key settings include:
 
-- **OPENAI_API_KEY** - Your LLM API key (currently OpenAI, alternative to environment variable)
+- **OPENAI_API_KEY** - OpenAI API key (alternative to the environment variable)
+- **ANTHROPIC_API_KEY** - Anthropic API key, to run on Claude instead
+- **LLM_PROVIDER** - `openai` or `anthropic`, only needed when both keys are set
 
 Example `.env` file:
 

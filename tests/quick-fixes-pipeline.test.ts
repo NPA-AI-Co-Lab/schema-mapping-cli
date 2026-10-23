@@ -80,6 +80,9 @@ describe('qf-1: analyzeDataWithDb lazy client (full pipeline)', () => {
     ]);
     originalApiKey = process.env.OPENAI_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    // No Anthropic key either, so the run has no LLM provider at all
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.LLM_PROVIDER;
   });
 
   afterEach(async () => {

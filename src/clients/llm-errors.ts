@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * Maximum retry-after delay we will ever honour, to guard against
@@ -73,7 +74,7 @@ function getHeaderValue(headers: unknown, name: string): string | undefined {
 }
 
 /**
- * `instanceof` guard that tolerates a mocked/partial `openai` module (e.g.
+ * `instanceof` guard that tolerates a mocked/partial SDK module (e.g.
  * in tests) where the referenced error class may not be a constructor.
  */
 function isInstanceOfSafe(err: unknown, ctor: unknown): boolean {
@@ -142,11 +143,14 @@ export function normalizeLLMError(err: unknown, ctx: LLMErrorContext = {}): LLMR
   const isRateLimit =
     status === 429 ||
     isInstanceOfSafe(err, OpenAI.RateLimitError) ||
+    isInstanceOfSafe(err, Anthropic.RateLimitError) ||
     code === 'rate_limit_exceeded';
 
   const isConnectionIssue =
     isInstanceOfSafe(err, OpenAI.APIConnectionError) ||
     isInstanceOfSafe(err, OpenAI.APIConnectionTimeoutError) ||
+    isInstanceOfSafe(err, Anthropic.APIConnectionError) ||
+    isInstanceOfSafe(err, Anthropic.APIConnectionTimeoutError) ||
     errName === 'APIConnectionError' ||
     errName === 'APIConnectionTimeoutError';
 

@@ -59,7 +59,7 @@ export function setupCliProgram(program: Command, pkg: PackageInfo) {
     .option('-q, --quiet', 'Suppress informational output (stderr)')
     .option('--rate-limit-retries <n>', 'Extra retries for rate-limit errors (0-20)')
     .option('--rate-limit-max-wait <ms>', 'Upper bound for Retry-After wait in ms (1000-600000)')
-    .option('--sdk-retries <n>', 'OpenAI SDK retry count (0-5)')
+    .option('--sdk-retries <n>', 'LLM SDK retry count (0-5)')
     .addOption(
       standaloneNoOption('--no-adaptive-concurrency', 'Disable adaptive concurrency halving')
     )
