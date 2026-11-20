@@ -50,7 +50,7 @@ function asyncAppendFile(filePath: string, data: string) {
   return writePromise;
 }
 
-function log(batchIndex: number, records: Record<string, string>[], batchSize: number) {
+function log(batchIndex: number, records: Record<string, unknown>[], batchSize: number) {
   const startLine = batchIndex * batchSize;
   const endLine = startLine + records.length - 1;
 
@@ -317,7 +317,7 @@ export function createLogger(enableLogging: boolean, batchSize = 5) {
 
   return enableLogging
     ? {
-        log: (batchIndex: number, records: Record<string, string>[]) =>
+        log: (batchIndex: number, records: Record<string, unknown>[]) =>
           log(batchIndex, records, batchSize),
         logValidationError: async (errorDetails: ValidationErrorDetails) =>
           countedLogValidationError(errorDetails, true),

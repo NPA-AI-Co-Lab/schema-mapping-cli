@@ -36,8 +36,11 @@ export type AnalysisResult = Record<string, unknown>;
  * PII processing handlers
  */
 export interface PIIHandlers {
-  encodePII: (records: RecordData[]) => {
-    processedBatch: RecordData[];
+  /** Masks every string in each record, at any depth (flat CSV rows and rule-mapped records). */
+  encodePII: <T extends Record<string, unknown>>(
+    records: T[]
+  ) => {
+    processedBatch: T[];
     encodingMap: EncodingMap;
   };
   decodePII: (results: AnalysisResult, encodingMap: EncodingMap) => AnalysisResult;
