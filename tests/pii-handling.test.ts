@@ -288,3 +288,100 @@ describe('PII Handling', () => {
     });
   });
 });
+
+// Issue #7: in rules mode the record handed to encodePII is the rule-mapped one (nested), not
+// the flat CSV row, and a top-level-only encoder left every value in it unmasked.
+describe('PII Encoding of nested (rule-mapped) records', () => {
+  let handlers: ReturnType<typeof createPIIHandlers>;
+
+  beforeEach(() => {
+    handlers = createPIIHandlers(true);
+  });
+
+  it('masks field-map keys inside nested objects', () => {
+    const records = [{ person: { email: 'john@example.com', name: 'John Doe', country: 'US' } }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person).toEqual({
+      email: 'EMAIL_1@GMAIL.COM',
+      name: 'NAME_1',
+      country: 'US',
+    });
+    expect(encodingMap).toEqual({ 'EMAIL_1@GMAIL.COM': 'john@example.com', NAME_1: 'John Doe' });
+  });
+
+  it('masks every item of an array stored under a field-map key', () => {
+    const records = [{ person: { emails: ['a@example.com', 'b@example.org'] } }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person.emails).toEqual(['EMAIL_1@GMAIL.COM', 'EMAIL_2@GMAIL.COM']);
+    expect(Object.values(encodingMap).sort()).toEqual(['a@example.com', 'b@example.org']);
+  });
+
+  it('masks the value of a { value, present } required-field wrapper by the wrapped key', () => {
+    const records = [{ person: { name: { value: 'John Doe', present: true } } }];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person.name).toEqual({ value: 'NAME_1', present: true });
+  });
+
+  it('regex-scans nested free text, including strings inside arrays of objects', () => {
+    const records = [
+      {
+        object: {
+          title: 'Write to np@aboba.com',
+          responses: [{ question: 'Contact?', answer: 'call 555-123-4567' }],
+        },
+      },
+    ];
+
+    const { processedBatch } = handlers.encodePII(records);
+    const serialized = JSON.stringify(processedBatch);
+
+    expect(serialized).not.toContain('np@aboba.com');
+    expect(serialized).not.toContain('555-123-4567');
+    expect(processedBatch[0].object.title).toBe('Write to EMAIL_1@GMAIL.COM');
+    expect(processedBatch[0].object.responses[0].answer).toBe('call PHONE_1');
+  });
+
+  it('masks a number stored under a field-map key and leaves other non-strings alone', () => {
+    const records = [{ person: { phone: 5551234567, score: 4, active: true, note: null } }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person).toEqual({
+      phone: 'PHONE_1',
+      score: 4,
+      active: true,
+      note: null,
+    });
+    expect(encodingMap).toEqual({ PHONE_1: '5551234567' });
+  });
+
+  it('does not mutate the input record', () => {
+    const record = { person: { email: 'john@example.com', emails: ['a@example.com'] } };
+    const snapshot = JSON.parse(JSON.stringify(record));
+
+    handlers.encodePII([record]);
+
+    expect(record).toEqual(snapshot);
+  });
+
+  it('round-trips a nested record through decodePII', () => {
+    const record = {
+      person: {
+        name: { value: 'John Doe', present: true },
+        email: 'john@example.com',
+        emails: ['a@example.com'],
+      },
+      object: { title: 'Write to np@aboba.com' },
+    };
+
+    const { processedBatch, encodingMap } = handlers.encodePII([record]);
+
+    expect(handlers.decodePII(processedBatch[0], encodingMap)).toEqual(record);
+  });
+});
