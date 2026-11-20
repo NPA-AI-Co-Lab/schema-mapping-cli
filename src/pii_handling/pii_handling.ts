@@ -1,10 +1,10 @@
 import { basePath, loadJSON, splitValues } from '../utils/index.js';
 import path from 'path';
 import { detectAndReplacePII } from './regex-detector.js';
-import type { EncodingMap, RecordData, AnalysisResult } from './types.js';
+import type { EncodingMap, AnalysisResult, PIIFieldConfig } from './types.js';
 import { getOrCreatePlaceholder } from './handle_placeholder.js';
 
-const PII_FIELD_MAP = loadJSON<Record<string, { placeholder: string; multi?: boolean }>>(
+const PII_FIELD_MAP = loadJSON<Record<string, PIIFieldConfig>>(
   path.resolve(basePath, 'static', 'pii_field_map.json')
 );
 
@@ -34,42 +34,115 @@ function encodeSingleValueField(
   return getOrCreatePlaceholder(value, placeholder, counters, encodingMap);
 }
 
-function encodeDataRow(
-  record: RecordData,
+const MAX_ENCODE_DEPTH = 100;
+
+function lookupFieldConfig(key: string): PIIFieldConfig | undefined {
+  const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
+  return PII_FIELD_MAP[normalizedKey];
+}
+
+/**
+ * Required schema fields are carried as `{ value, present }` by the deterministic rules
+ * (see `transformRow`). The wrapper is transparent for masking: its `value` is treated as
+ * if it sat directly under the wrapped field's own name.
+ */
+function isRequiredFieldWrapper(value: object): value is { value: unknown; present: boolean } {
+  return 'value' in value && typeof (value as { present?: unknown }).present === 'boolean';
+}
+
+function encodeString(
+  value: string,
+  fieldConfig: PIIFieldConfig | undefined,
   counters: Record<string, number>,
   encodingMap: EncodingMap
-): RecordData {
-  const newRecord: RecordData = { ...record };
+): string {
+  if (!value) return value;
 
-  for (const [key, value] of Object.entries(record)) {
-    if (!value || typeof value !== 'string') continue;
-
-    const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
-    const fieldConfig = PII_FIELD_MAP[normalizedKey];
-
-    if (fieldConfig) {
-      // Handle fields that are explicitly defined in the PII field map
-      const { placeholder, multi = false } = fieldConfig;
-      newRecord[key] = multi
-        ? encodeMultiValueField(value, placeholder, counters, encodingMap)
-        : encodeSingleValueField(value, placeholder, counters, encodingMap);
-    } else {
-      // For fields not in the map, scan for PII patterns using regex
-      const processedValue = detectAndReplacePII(value, counters, encodingMap);
-      if (processedValue !== value) {
-        newRecord[key] = processedValue;
-      }
-    }
+  if (fieldConfig) {
+    // Handle fields that are explicitly defined in the PII field map
+    const { placeholder, multi = false } = fieldConfig;
+    return multi
+      ? encodeMultiValueField(value, placeholder, counters, encodingMap)
+      : encodeSingleValueField(value, placeholder, counters, encodingMap);
   }
-  return newRecord;
+
+  // For fields not in the map, scan for PII patterns using regex
+  return detectAndReplacePII(value, counters, encodingMap);
+}
+
+/**
+ * Mask one value of a record, however deep it sits.
+ *
+ * A raw CSV row is flat (`{ primaryEmail: '…' }`), but in rules mode the record that goes to
+ * the LLM is the rule-mapped one: nested (`{ person: { primaryEmail, location: { postalCode } } }`),
+ * with arrays (`additionalEmails` after a `split` transform) and `{ value, present }` wrappers
+ * around required fields. Every string in that tree has to be masked, so this walks all of it.
+ *
+ * `fieldConfig` is the PII field map entry of the nearest enclosing key that has one: array
+ * items, a required-field wrapper's `value` and the properties of an object stored under a PII
+ * key are all masked with that key's placeholder. Strings with no such key are regex-scanned.
+ * Always returns new containers; the input is never mutated (in rules mode it is the
+ * deterministic prefill, which is merged into the output as-is).
+ */
+function encodeValue(
+  value: unknown,
+  fieldConfig: PIIFieldConfig | undefined,
+  counters: Record<string, number>,
+  encodingMap: EncodingMap,
+  depth: number
+): unknown {
+  if (depth > MAX_ENCODE_DEPTH) {
+    throw new Error('PII encoding: maximum nesting depth exceeded; refusing to send unmasked data');
+  }
+
+  if (typeof value === 'string') {
+    return encodeString(value, fieldConfig, counters, encodingMap);
+  }
+
+  // A number under a PII key (e.g. a postal code after `toNumber`) is still PII.
+  if (fieldConfig && (typeof value === 'number' || typeof value === 'bigint')) {
+    return encodeSingleValueField(String(value), fieldConfig.placeholder, counters, encodingMap);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => encodeValue(item, fieldConfig, counters, encodingMap, depth + 1));
+  }
+
+  if (value !== null && typeof value === 'object') {
+    if (isRequiredFieldWrapper(value)) {
+      return {
+        ...value,
+        value: encodeValue(value.value, fieldConfig, counters, encodingMap, depth + 1),
+      };
+    }
+
+    const encoded: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      const childConfig = lookupFieldConfig(key) ?? fieldConfig;
+      encoded[key] = encodeValue(child, childConfig, counters, encodingMap, depth + 1);
+    }
+    return encoded;
+  }
+
+  return value;
+}
+
+function encodeDataRow<T extends Record<string, unknown>>(
+  record: T,
+  counters: Record<string, number>,
+  encodingMap: EncodingMap
+): T {
+  return encodeValue(record, undefined, counters, encodingMap, 0) as T;
 }
 
 function createEncodePII() {
   // Persistent counters across all batches
   const globalCounters: Record<string, number> = {};
 
-  return function encodePII(records: RecordData[]): {
-    processedBatch: RecordData[];
+  return function encodePII<T extends Record<string, unknown>>(
+    records: T[]
+  ): {
+    processedBatch: T[];
     encodingMap: EncodingMap;
   } {
     const encodingMap: EncodingMap = {};
@@ -139,7 +212,7 @@ export function createPIIHandlers(enablePiiProcessing: boolean) {
     };
   }
   return {
-    encodePII: (records: RecordData[]) => ({
+    encodePII: <T extends Record<string, unknown>>(records: T[]) => ({
       processedBatch: records,
       encodingMap: {},
     }),
