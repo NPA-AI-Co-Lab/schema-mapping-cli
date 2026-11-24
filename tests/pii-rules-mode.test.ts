@@ -38,6 +38,7 @@ const SCHEMA = {
           properties: { postalCode: { type: 'string', description: 'Postal code' } },
         },
         notes: { type: 'string', description: 'Free text' },
+        sourceRecord: { type: 'string', description: 'Reference to the source user record' },
         score: { type: 'number', description: 'LLM-derived score' },
       },
     },
@@ -55,13 +56,16 @@ const RULES = {
     'person.additionalEmails': { source: 'additionalEmails', transforms: ['split'] },
     'person.location.postalCode': { source: 'postalCode', transforms: ['trim'] },
     'person.notes': { source: 'comment', transforms: ['trim'] },
+    // A second, non-PII-named field fed from the same column (like `action.person` in the
+    // shipped rules): the value must be masked here too.
+    'person.sourceRecord': { source: 'userID', transforms: ['trim'] },
   },
 };
 
 const CSV = [
   'userID,givenName,familyName,primaryEmail,additionalEmails,postalCode,comment',
   'u1,Jane,Doe,jane.doe@example.com,"j.doe@alt.com, jane.alt@example.org",95409,Minimal engagement. np@aboba.com',
-  'u2,Michael,Brown,michael.brown@example.com,m.brown@alt.com,60601,Opened the newsletter',
+  'u2,Michael,Brown,michael.brown@example.com,m.brown@alt.com,60601,Michael Brown opened the newsletter',
 ].join('\n');
 
 /** Every personal value of the CSV above; none of them may reach the LLM. */
@@ -138,6 +142,16 @@ describe('issue #7: hidePII masks the LLM input in rules mode', () => {
     expect(first.person.location.postalCode).toMatch(/^ADDRESS_\d+$/);
     // …and regex masking of an email inside free text mapped by a rule.
     expect(first.person.notes).toMatch(/^Minimal engagement\. EMAIL_\d+@GMAIL\.COM$/);
+
+    // The user ID copied into a reference field gets the same placeholder as person.userID,
+    // and names mentioned in free text are masked too.
+    expect(first.person.userID.value).toMatch(/^ID_\d+$/);
+    expect(first.person.sourceRecord).toBe(first.person.userID.value);
+    expect(sent).not.toMatch(/"u[12]"/);
+    const second = JSON.parse(client.calls[0].input.find((m) => m.role === 'user')!.content)[1];
+    expect(second.person.notes).toBe(
+      `${second.person.givenName} ${second.person.familyName.value} opened the newsletter`
+    );
   });
 
   it('still writes the real values to the output', async () => {

@@ -135,6 +135,93 @@ function encodeDataRow<T extends Record<string, unknown>>(
   return encodeValue(record, undefined, counters, encodingMap, 0) as T;
 }
 
+/** A known PII value shorter than this is never masked (too ambiguous to be identifying). */
+const MIN_KNOWN_VALUE_LENGTH = 2;
+/** A known PII value at least this long is also masked where it appears inside a longer string. */
+const MIN_EMBEDDED_VALUE_LENGTH = 3;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+interface KnownValueMatcher {
+  /** Masked value → its placeholder. */
+  placeholderByValue: Map<string, string>;
+  /**
+   * Matches, in order of preference: an existing placeholder (kept as is, so it is never
+   * re-masked), or a known value of at least MIN_EMBEDDED_VALUE_LENGTH that stands as a whole
+   * word (not preceded or followed by a letter, digit or `_`, so `Ann` is not found in
+   * `Announcement`).
+   */
+  regex: RegExp | null;
+}
+
+function buildKnownValueMatcher(encodingMap: EncodingMap): KnownValueMatcher | null {
+  const placeholderByValue = new Map<string, string>();
+  for (const [placeholder, value] of Object.entries(encodingMap)) {
+    if (value.length >= MIN_KNOWN_VALUE_LENGTH && !placeholderByValue.has(value)) {
+      placeholderByValue.set(value, placeholder);
+    }
+  }
+  if (placeholderByValue.size === 0) return null;
+
+  const byLengthDesc = (a: string, b: string) => b.length - a.length;
+  const placeholders = Object.keys(encodingMap).sort(byLengthDesc).map(escapeRegExp);
+  const embeddable = [...placeholderByValue.keys()]
+    .filter((value) => value.length >= MIN_EMBEDDED_VALUE_LENGTH)
+    .sort(byLengthDesc)
+    .map(escapeRegExp);
+
+  const regex =
+    embeddable.length === 0
+      ? null
+      : new RegExp(
+          `(${placeholders.join('|')})|(?<![\\p{L}\\p{N}_])(?:${embeddable.join('|')})(?![\\p{L}\\p{N}_])`,
+          'gu'
+        );
+
+  return { placeholderByValue, regex };
+}
+
+/**
+ * Second pass: mask every other occurrence of a value that the first pass already masked.
+ *
+ * The first pass masks a value where it is recognised as PII — under a field-map key, or by
+ * the regexes. The same value often appears elsewhere where it is not recognised: in rules
+ * mode the user ID is also copied into references such as `action.person`, and a name can be
+ * mentioned in free text (`"Jane asked about…"`). Without this pass the LLM would get the
+ * value in the clear there, and could link it to the placeholder. A string equal to a known
+ * value is replaced whole; a longer string has every whole-word occurrence replaced.
+ */
+function maskKnownValues(value: unknown, matcher: KnownValueMatcher, depth: number): unknown {
+  if (depth > MAX_ENCODE_DEPTH) {
+    throw new Error('PII encoding: maximum nesting depth exceeded; refusing to send unmasked data');
+  }
+
+  if (typeof value === 'string') {
+    const whole = matcher.placeholderByValue.get(value);
+    if (whole !== undefined) return whole;
+    if (!matcher.regex) return value;
+    return value.replace(matcher.regex, (match, placeholder: string | undefined) =>
+      placeholder !== undefined ? match : (matcher.placeholderByValue.get(match) ?? match)
+    );
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => maskKnownValues(item, matcher, depth + 1));
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const masked: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      masked[key] = maskKnownValues(child, matcher, depth + 1);
+    }
+    return masked;
+  }
+
+  return value;
+}
+
 function createEncodePII() {
   // Persistent counters across all batches
   const globalCounters: Record<string, number> = {};
@@ -147,9 +234,13 @@ function createEncodePII() {
   } {
     const encodingMap: EncodingMap = {};
 
-    const processedBatch = records.map((record) =>
-      encodeDataRow(record, globalCounters, encodingMap)
-    );
+    const firstPass = records.map((record) => encodeDataRow(record, globalCounters, encodingMap));
+
+    // Values masked anywhere in the batch are masked everywhere in the batch.
+    const matcher = buildKnownValueMatcher(encodingMap);
+    const processedBatch = matcher
+      ? firstPass.map((record) => maskKnownValues(record, matcher, 0) as T)
+      : firstPass;
 
     return { processedBatch, encodingMap };
   };
