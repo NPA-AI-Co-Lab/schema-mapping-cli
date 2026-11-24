@@ -329,6 +329,22 @@ describe('PII Encoding of nested (rule-mapped) records', () => {
     expect(processedBatch[0].person.name).toEqual({ value: 'NAME_1', present: true });
   });
 
+  it('treats an object with fields besides value/present as an ordinary object, not a wrapper', () => {
+    const records = [
+      { person: { value: 'public', present: true, email: 'secret@example.com', note: 'x@y.org' } },
+    ];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person).toEqual({
+      value: 'public',
+      present: true,
+      email: 'EMAIL_1@GMAIL.COM',
+      note: 'EMAIL_2@GMAIL.COM',
+    });
+    expect(JSON.stringify(processedBatch)).not.toMatch(/secret@example\.com|x@y\.org/);
+  });
+
   it('regex-scans nested free text, including strings inside arrays of objects', () => {
     const records = [
       {

@@ -45,9 +45,18 @@ function lookupFieldConfig(key: string): PIIFieldConfig | undefined {
  * Required schema fields are carried as `{ value, present }` by the deterministic rules
  * (see `transformRow`). The wrapper is transparent for masking: its `value` is treated as
  * if it sat directly under the wrapped field's own name.
+ *
+ * Only an object with exactly these two keys is a wrapper. Anything else that happens to have
+ * `value` and a boolean `present` (e.g. an entity with those properties next to an `email`) is
+ * an ordinary object and is walked key by key, so none of its other fields skips masking.
  */
 function isRequiredFieldWrapper(value: object): value is { value: unknown; present: boolean } {
-  return 'value' in value && typeof (value as { present?: unknown }).present === 'boolean';
+  const keys = Object.keys(value);
+  return (
+    keys.length === 2 &&
+    'value' in value &&
+    typeof (value as { present?: unknown }).present === 'boolean'
+  );
 }
 
 function encodeString(
@@ -111,8 +120,8 @@ function encodeValue(
   if (value !== null && typeof value === 'object') {
     if (isRequiredFieldWrapper(value)) {
       return {
-        ...value,
         value: encodeValue(value.value, fieldConfig, counters, encodingMap, depth + 1),
+        present: value.present,
       };
     }
 
