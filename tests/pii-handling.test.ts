@@ -11,6 +11,7 @@ vi.mock('../src/utils/index.js', () => ({
     email: { placeholder: 'EMAIL_{ind}@GMAIL.COM' },
     name: { placeholder: 'NAME_{ind}' },
     phone: { placeholder: 'PHONE_{ind}' },
+    userid: { placeholder: 'ID_{ind}' },
     emails: { placeholder: 'EMAIL_{ind}@GMAIL.COM', multi: true },
   })),
   splitValues: vi.fn((value: string) => value.split(', ').map((v) => v.trim())),
@@ -286,5 +287,196 @@ describe('PII Handling', () => {
       expect(result2).toContain('EMAIL_1');
       expect(Object.keys(encodingMap).length).toBe(1);
     });
+  });
+});
+
+// Issue #7: in rules mode the record handed to encodePII is the rule-mapped one (nested), not
+// the flat CSV row, and a top-level-only encoder left every value in it unmasked.
+describe('PII Encoding of nested (rule-mapped) records', () => {
+  let handlers: ReturnType<typeof createPIIHandlers>;
+
+  beforeEach(() => {
+    handlers = createPIIHandlers(true);
+  });
+
+  it('masks field-map keys inside nested objects', () => {
+    const records = [{ person: { email: 'john@example.com', name: 'John Doe', country: 'US' } }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person).toEqual({
+      email: 'EMAIL_1@GMAIL.COM',
+      name: 'NAME_1',
+      country: 'US',
+    });
+    expect(encodingMap).toEqual({ 'EMAIL_1@GMAIL.COM': 'john@example.com', NAME_1: 'John Doe' });
+  });
+
+  it('masks every item of an array stored under a field-map key', () => {
+    const records = [{ person: { emails: ['a@example.com', 'b@example.org'] } }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person.emails).toEqual(['EMAIL_1@GMAIL.COM', 'EMAIL_2@GMAIL.COM']);
+    expect(Object.values(encodingMap).sort()).toEqual(['a@example.com', 'b@example.org']);
+  });
+
+  it('masks the value of a { value, present } required-field wrapper by the wrapped key', () => {
+    const records = [{ person: { name: { value: 'John Doe', present: true } } }];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person.name).toEqual({ value: 'NAME_1', present: true });
+  });
+
+  it('treats an object with fields besides value/present as an ordinary object, not a wrapper', () => {
+    const records = [
+      { person: { value: 'public', present: true, email: 'secret@example.com', note: 'x@y.org' } },
+    ];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person).toEqual({
+      value: 'public',
+      present: true,
+      email: 'EMAIL_1@GMAIL.COM',
+      note: 'EMAIL_2@GMAIL.COM',
+    });
+    expect(JSON.stringify(processedBatch)).not.toMatch(/secret@example\.com|x@y\.org/);
+  });
+
+  it('regex-scans nested free text, including strings inside arrays of objects', () => {
+    const records = [
+      {
+        object: {
+          title: 'Write to np@aboba.com',
+          responses: [{ question: 'Contact?', answer: 'call 555-123-4567' }],
+        },
+      },
+    ];
+
+    const { processedBatch } = handlers.encodePII(records);
+    const serialized = JSON.stringify(processedBatch);
+
+    expect(serialized).not.toContain('np@aboba.com');
+    expect(serialized).not.toContain('555-123-4567');
+    expect(processedBatch[0].object.title).toBe('Write to EMAIL_1@GMAIL.COM');
+    expect(processedBatch[0].object.responses[0].answer).toBe('call PHONE_1');
+  });
+
+  it('masks a number stored under a field-map key and leaves other non-strings alone', () => {
+    const records = [{ person: { phone: 5551234567, score: 4, active: true, note: null } }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person).toEqual({
+      phone: 'PHONE_1',
+      score: 4,
+      active: true,
+      note: null,
+    });
+    expect(encodingMap).toEqual({ PHONE_1: '5551234567' });
+  });
+
+  it('does not mutate the input record', () => {
+    const record = { person: { email: 'john@example.com', emails: ['a@example.com'] } };
+    const snapshot = JSON.parse(JSON.stringify(record));
+
+    handlers.encodePII([record]);
+
+    expect(record).toEqual(snapshot);
+  });
+
+  it('round-trips a nested record through decodePII', () => {
+    const record = {
+      person: {
+        name: { value: 'John Doe', present: true },
+        email: 'john@example.com',
+        emails: ['a@example.com'],
+      },
+      object: { title: 'Write to np@aboba.com' },
+    };
+
+    const { processedBatch, encodingMap } = handlers.encodePII([record]);
+
+    expect(handlers.decodePII(processedBatch[0], encodingMap)).toEqual(record);
+  });
+});
+
+describe('PII Encoding: values masked once are masked everywhere in the batch', () => {
+  let handlers: ReturnType<typeof createPIIHandlers>;
+
+  beforeEach(() => {
+    handlers = createPIIHandlers(true);
+  });
+
+  it('masks a user ID copied into a reference field with the same placeholder', () => {
+    const records = [
+      {
+        person: { userID: { value: 'u002', present: true } },
+        action: { person: { value: 'u002', present: true }, referrer: 'newswebsite.org/home' },
+      },
+    ];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person.userID.value).toBe('ID_1');
+    expect(processedBatch[0].action.person).toEqual({ value: 'ID_1', present: true });
+    expect(processedBatch[0].action.referrer).toBe('newswebsite.org/home');
+    expect(JSON.stringify(processedBatch)).not.toContain('u002');
+  });
+
+  it('masks names mentioned in free text, including names from other records of the batch', () => {
+    const records = [
+      { person: { name: 'Jane' }, comment: 'Jane asked about Brown, then left.' },
+      { person: { name: 'Brown' }, comment: 'No comment' },
+    ];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].comment).toBe('NAME_1 asked about NAME_2, then left.');
+    expect(processedBatch[1].comment).toBe('No comment');
+  });
+
+  it('only masks whole words, so a name inside another word is left alone', () => {
+    const records = [{ person: { name: 'Ann' }, comment: 'Announcement for Ann and Anna' }];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].comment).toBe('Announcement for NAME_1 and Anna');
+  });
+
+  it('masks a short value only where it is the whole string', () => {
+    const records = [{ person: { userID: 'u1' }, ref: 'u1', comment: 'u1 is a short id' }];
+
+    const { processedBatch } = handlers.encodePII(records);
+
+    expect(processedBatch[0].ref).toBe('ID_1');
+    expect(processedBatch[0].comment).toBe('u1 is a short id');
+  });
+
+  it('never re-masks a placeholder, even when a known value occurs inside it', () => {
+    const records = [{ person: { name: 'NAME' }, comment: 'np@aboba.com wrote to NAME' }];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(processedBatch[0].person.name).toBe('NAME_1');
+    expect(processedBatch[0].comment).toBe('EMAIL_1@GMAIL.COM wrote to NAME_1');
+    expect(handlers.decodePII(processedBatch[0], encodingMap)).toEqual(records[0]);
+  });
+
+  it('round-trips records with masked references and free-text mentions', () => {
+    const records = [
+      {
+        person: { userID: 'u002', name: 'Jane Doe' },
+        action: { person: 'u002' },
+        comment: 'Jane Doe (u002) replied',
+      },
+    ];
+
+    const { processedBatch, encodingMap } = handlers.encodePII(records);
+
+    expect(JSON.stringify(processedBatch)).not.toMatch(/u002|Jane Doe/);
+    expect(handlers.decodePII(processedBatch[0], encodingMap)).toEqual(records[0]);
   });
 });

@@ -610,17 +610,17 @@ export async function analyzeDataWithDb(
             const rowIds = batchRows.map((row) => row.row_id);
 
             // Apply deterministic transformations if rules exist
-            let transformedBatch: RecordData[] = batchData;
+            let transformedBatch: Record<string, unknown>[] = batchData;
             let deterministicPrefills: DeterministicFieldResult[] | undefined = undefined;
 
             if (rulesContext) {
               deterministicPrefills = batchData.map((row) => transformRow(row, rulesContext));
-              // Note: p.mapped may have unknown values, but encodePII expects RecordData
-              // Cast is safe because transformRow output is compatible with RecordData structure
-              transformedBatch = deterministicPrefills.map((p) => p.mapped as RecordData);
+              transformedBatch = deterministicPrefills.map((p) => p.mapped);
             }
 
-            // Encode PII
+            // Encode PII. In rules mode the records are the rule-mapped ones — nested objects,
+            // arrays and `{ value, present }` wrappers — so encodePII masks at every depth. It
+            // returns copies: the prefills keep the real values for the merge after the LLM call.
             const { processedBatch: encodedBatch, encodingMap } = encodePII(transformedBatch);
 
             // Log LLM input for debugging
