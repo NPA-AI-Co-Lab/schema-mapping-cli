@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--no-llm-fields <fields>` now keeps the listed fields deterministic, as documented. Commander treated the `--no-` prefix as the negated form of `--llm-fields`, so the value was stored under `llmFields` and the listed fields were forced *through* the LLM instead of away from it; `noLlmFields` was never set. The option is now registered as a standalone value option. Tests: `tests/cli-negated-flags.test.ts`
 - `--no-adaptive-concurrency` is no longer ignored. Commander parsed it as the negation of a (non-existent) `--adaptive-concurrency`, storing `adaptiveConcurrency: false` — and `true` by default even when the flag was absent — while the CLI reads `noAdaptiveConcurrency`, so the config file value always won. The flag is now a standalone option that is undefined unless given, so passing it disables adaptive concurrency and omitting it leaves the config value in effect. Tests: `tests/cli-negated-flags.test.ts`
 
+### Security
+
+- `npm audit fix` (no `--force`): lockfile-only updates within the existing semver ranges, `package.json` unchanged. `npm audit` goes from 28 vulnerabilities (1 low, 6 moderate, 18 high, 3 critical) to 19 (12 moderate, 4 high, 3 critical); some moderate ones were high before and now only remain through a dependency. Fixed: `brace-expansion`, `minimatch`, `glob` (partly), `js-yaml`, `lodash`, `form-data`, `flatted`, `nanoid`, `picomatch`, `qs`, `ws`, `postcss`, `rollup` and others. Runtime dependency updated: `openai` 5.12.0 → 5.23.2 (same major). Not fixed here, they need major upgrades: `vitest` / `@vitest/coverage-v8` 2 → 5 (dev only; the three critical ones, plus `vite`, `esbuild`, `tinypool`), `zod` 3 → 4 with `zod-from-json-schema` and `openai` 5 → 7 (runtime), and the `typescript-eslint` chain (dev only).
+
 ## [2.3.0] - 2026-09-24
 
 The Audience Data Commons data model moves out of this repository into its own standard,
