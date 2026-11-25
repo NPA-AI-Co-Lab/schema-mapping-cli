@@ -36,7 +36,7 @@ The tool supports multiple LLM providers through a pluggable client architecture
 
 ## Prerequisites
 
-- Node.js 20 or higher (CI runs on Node 22)
+- Node.js 22 or higher (tested on 22–26; `.nvmrc` pins 22, which CI uses), with the npm that ships with it. Node.js 20 is no longer supported: the SQLite module (`better-sqlite3` 13) needs Node.js 22+.
 - An OpenAI API key is required only for the AI path (fields listed under `llm.fields` in your rules file). Rules-only runs need no key. See [Deterministic rules file](#deterministic-rules-file) for how to write a rules file where every field is determined without LLM calls.
 
 ## Installation

@@ -7,6 +7,23 @@ import { initializeSchema, validateSchema } from './schema.js';
 import path from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
+const NATIVE_MODULE_ERROR =
+  /bindings file|NODE_MODULE_VERSION|did not self-register|invalid ELF header|wrong ELF class|was compiled against a different Node\.js version|better_sqlite3\.node/i;
+
+/**
+ * Explain a failure to load better-sqlite3's native module, which otherwise surfaces as e.g.
+ * "Could not locate the bindings file" with no hint of the cause (#10): an unsupported Node.js
+ * version, or node_modules installed by another Node.js / npm than the one running the CLI.
+ */
+export function nativeModuleHint(message: string): string {
+  if (!NATIVE_MODULE_ERROR.test(message)) return '';
+  return (
+    `\nThe SQLite module (better-sqlite3) could not be loaded on Node.js ${process.version}. ` +
+    'This tool needs Node.js 22 or newer. Reinstall the dependencies with the npm that ships ' +
+    'with the Node.js you run it on: rm -rf node_modules && npm ci'
+  );
+}
+
 export class DatabaseConnection {
   private db: Database.Database | null = null;
   private readonly dbPath: string;
@@ -48,7 +65,9 @@ export class DatabaseConnection {
       }
     } catch (error) {
       const dbError = error as Error;
-      throw new Error(`Failed to connect to database at '${this.dbPath}': ${dbError.message}`);
+      throw new Error(
+        `Failed to connect to database at '${this.dbPath}': ${dbError.message}${nativeModuleHint(dbError.message)}`
+      );
     }
   }
 

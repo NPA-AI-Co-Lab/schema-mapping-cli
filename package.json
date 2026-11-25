@@ -34,10 +34,13 @@
   "author": "",
   "license": "ISC",
   "description": "CLI application to structure and tag data",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@coffeeandfun/remove-pii": "^2.0.0",
     "@npa-ai-co-lab/adc-schema": "^1.0.0",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^13.2.0",
     "commander": "^14.0.0",
     "csv-parser": "^3.2.0",
     "csv-writer": "^1.6.0",
@@ -82,5 +85,9 @@
   "overrides": {
     "minimist": "^1.2.7",
     "superagent": "^10.2.2"
+  },
+  "allowScripts": {
+    "better-sqlite3": false,
+    "esbuild": false
   }
 }
