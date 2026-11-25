@@ -183,7 +183,9 @@ export function validateConfig(config: AppConfig): void {
   // Validate rateLimitMaxRetries
   if (
     config.rateLimitMaxRetries !== undefined &&
-    (config.rateLimitMaxRetries < 0 || config.rateLimitMaxRetries > 20)
+    (!Number.isInteger(config.rateLimitMaxRetries) ||
+      config.rateLimitMaxRetries < 0 ||
+      config.rateLimitMaxRetries > 20)
   ) {
     errors.push(`rateLimitMaxRetries must be between 0 and 20, got ${config.rateLimitMaxRetries}`);
   }
@@ -201,7 +203,9 @@ export function validateConfig(config: AppConfig): void {
   // Validate sdkMaxRetries
   if (
     config.sdkMaxRetries !== undefined &&
-    (config.sdkMaxRetries < 0 || config.sdkMaxRetries > 5)
+    (!Number.isInteger(config.sdkMaxRetries) ||
+      config.sdkMaxRetries < 0 ||
+      config.sdkMaxRetries > 5)
   ) {
     errors.push(`sdkMaxRetries must be between 0 and 5, got ${config.sdkMaxRetries}`);
   }

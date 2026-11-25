@@ -13,7 +13,7 @@ import {
 import { deriveDatabasePath } from '../database/index.js';
 import { DEFAULT_HIDE_PII, DEFAULT_RETRIES_NUMBER } from '../utils/config-defaults.js';
 import { CliOptions, PackageInfo } from './cli-types.js';
-import { shouldUseInteractiveMode, validateOptions } from './cli-config.js';
+import { parseIntegerOption, shouldUseInteractiveMode, validateOptions } from './cli-config.js';
 
 function parseFieldList(value?: string): string[] | undefined {
   if (!value) {
@@ -74,11 +74,11 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
 
   const appParams: AppConfig = {
     ...baseParams,
-    batchSize: options.batchSize ? parseInt(options.batchSize, 10) : baseParams.batchSize,
+    batchSize: options.batchSize ? parseIntegerOption(options.batchSize) : baseParams.batchSize,
     concurrencySize: options.concurrency
-      ? parseInt(options.concurrency, 10)
+      ? parseIntegerOption(options.concurrency)
       : baseParams.concurrencySize,
-    retriesNumber: options.retries ? parseInt(options.retries, 10) : baseParams.retriesNumber,
+    retriesNumber: options.retries ? parseIntegerOption(options.retries) : baseParams.retriesNumber,
     defaultModel: options.model || baseParams.defaultModel,
     fallbackModel: options.fallbackModel || baseParams.fallbackModel,
     enableLogging: options.logging ?? baseParams.enableLogging,
@@ -90,12 +90,14 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
     taxonomiesPath: options.taxonomies || baseParams.taxonomiesPath,
     llmFieldOverrides,
     rateLimitMaxRetries: options.rateLimitRetries
-      ? parseInt(options.rateLimitRetries, 10)
+      ? parseIntegerOption(options.rateLimitRetries)
       : baseParams.rateLimitMaxRetries,
     rateLimitMaxWaitMs: options.rateLimitMaxWait
-      ? parseInt(options.rateLimitMaxWait, 10)
+      ? parseIntegerOption(options.rateLimitMaxWait)
       : baseParams.rateLimitMaxWaitMs,
-    sdkMaxRetries: options.sdkRetries ? parseInt(options.sdkRetries, 10) : baseParams.sdkMaxRetries,
+    sdkMaxRetries: options.sdkRetries
+      ? parseIntegerOption(options.sdkRetries)
+      : baseParams.sdkMaxRetries,
     adaptiveConcurrency:
       options.noAdaptiveConcurrency !== undefined
         ? !options.noAdaptiveConcurrency
@@ -179,12 +181,12 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     databasePath: baseConfig.databasePath,
     enableLogging: options.logging ?? baseConfig.enableLogging,
     hidePII: options.hidePii ?? baseConfig.hidePII,
-    retriesNumber: options.retries ? parseInt(options.retries, 10) : baseConfig.retriesNumber,
+    retriesNumber: options.retries ? parseIntegerOption(options.retries) : baseConfig.retriesNumber,
     requiredFieldErrorsFailBatch:
       options.requiredFieldsFailBatch ?? baseConfig.requiredFieldErrorsFailBatch,
-    batchSize: options.batchSize ? parseInt(options.batchSize, 10) : baseConfig.batchSize,
+    batchSize: options.batchSize ? parseIntegerOption(options.batchSize) : baseConfig.batchSize,
     concurrencySize: options.concurrency
-      ? parseInt(options.concurrency, 10)
+      ? parseIntegerOption(options.concurrency)
       : baseConfig.concurrencySize,
     defaultModel: options.model || getDefaultModel(baseConfig),
     fallbackModel: options.fallbackModel || getFallbackModel(baseConfig),
@@ -194,12 +196,14 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     llmFieldOverrides,
     resumeMode: baseConfig.resumeMode,
     rateLimitMaxRetries: options.rateLimitRetries
-      ? parseInt(options.rateLimitRetries, 10)
+      ? parseIntegerOption(options.rateLimitRetries)
       : baseConfig.rateLimitMaxRetries,
     rateLimitMaxWaitMs: options.rateLimitMaxWait
-      ? parseInt(options.rateLimitMaxWait, 10)
+      ? parseIntegerOption(options.rateLimitMaxWait)
       : baseConfig.rateLimitMaxWaitMs,
-    sdkMaxRetries: options.sdkRetries ? parseInt(options.sdkRetries, 10) : baseConfig.sdkMaxRetries,
+    sdkMaxRetries: options.sdkRetries
+      ? parseIntegerOption(options.sdkRetries)
+      : baseConfig.sdkMaxRetries,
     adaptiveConcurrency:
       options.noAdaptiveConcurrency !== undefined
         ? !options.noAdaptiveConcurrency

@@ -2,6 +2,16 @@ import { validateJSONPath, validateDirectoryPath } from '../utils/index.js';
 import { CliOptions } from './cli-types.js';
 
 /**
+ * Parse a numeric CLI flag. Unlike parseInt, which silently turned `2.7` into 2 and `5abc` into
+ * 5, this keeps the value as written (`2.7`, NaN), so validation can reject it with the setting
+ * named.
+ */
+export function parseIntegerOption(value: string): number {
+  const trimmed = value.trim();
+  return trimmed === '' ? Number.NaN : Number(trimmed);
+}
+
+/**
  * Check if we should use interactive mode
  * Interactive mode is used when no config, no input, and not using stdout
  */
@@ -47,23 +57,25 @@ export function validateOptions(options: CliOptions): void {
   }
 
   if (options.batchSize) {
-    const batchSize = parseInt(options.batchSize, 10);
-    if (isNaN(batchSize) || batchSize < 1 || batchSize > 50) {
-      errors.push('Batch size must be a number between 1 and 50');
+    const batchSize = parseIntegerOption(options.batchSize);
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 50) {
+      errors.push(`Batch size must be a whole number between 1 and 50, got "${options.batchSize}"`);
     }
   }
 
   if (options.concurrency) {
-    const concurrency = parseInt(options.concurrency, 10);
-    if (isNaN(concurrency) || concurrency < 1 || concurrency > 20) {
-      errors.push('Concurrency must be a number between 1 and 20');
+    const concurrency = parseIntegerOption(options.concurrency);
+    if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 20) {
+      errors.push(
+        `Concurrency must be a whole number between 1 and 20, got "${options.concurrency}"`
+      );
     }
   }
 
   if (options.retries) {
-    const retries = parseInt(options.retries, 10);
-    if (isNaN(retries) || retries < 0 || retries > 10) {
-      errors.push('Retries must be a number between 0 and 10');
+    const retries = parseIntegerOption(options.retries);
+    if (!Number.isInteger(retries) || retries < 0 || retries > 10) {
+      errors.push(`Retries must be a whole number between 0 and 10, got "${options.retries}"`);
     }
   }
 

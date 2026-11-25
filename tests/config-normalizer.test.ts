@@ -337,3 +337,31 @@ describe('Config Normalizer - hidePII / retriesNumber / logging defaults (#13)',
     expect(() => validateConfig(config)).toThrow(/retriesNumber must be a non-negative integer/);
   });
 });
+
+describe('Config Normalizer - retry counts must be whole numbers', () => {
+  const baseConfig: AppConfig = {
+    dataPaths: ['test.csv'],
+    schemaPath: 'schema.jsonld',
+    outputPath: 'output.jsonld',
+    enableLogging: false,
+    hidePII: false,
+    retriesNumber: 2,
+    requiredFieldErrorsFailBatch: false,
+    batchSize: 5,
+    concurrencySize: 5,
+    defaultModel: 'gpt-4',
+    fallbackModel: 'gpt-3.5-turbo',
+  };
+
+  it('rejects a fractional rateLimitMaxRetries (e.g. --rate-limit-retries 2.7)', () => {
+    expect(() => validateConfig({ ...baseConfig, rateLimitMaxRetries: 2.7 })).toThrow(
+      'rateLimitMaxRetries must be between 0 and 20, got 2.7'
+    );
+  });
+
+  it('rejects a fractional sdkMaxRetries', () => {
+    expect(() => validateConfig({ ...baseConfig, sdkMaxRetries: 1.5 })).toThrow(
+      'sdkMaxRetries must be between 0 and 5, got 1.5'
+    );
+  });
+});

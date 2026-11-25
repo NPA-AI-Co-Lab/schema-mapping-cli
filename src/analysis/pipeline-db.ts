@@ -33,7 +33,7 @@ import {
   JsonLdSchema,
 } from '../jsonld/index.js';
 import { createLogger } from '../logging.js';
-import { ConfigurationError } from '../utils/errors.js';
+import { ConfigChangedError, ConfigurationError } from '../utils/errors.js';
 import { createPIIHandlers } from '../pii_handling/pii_handling.js';
 import type { RecordData } from '../pii_handling/types.js';
 import { processBatch } from './processor.js';
@@ -258,9 +258,8 @@ export async function analyzeDataWithDb(
         // Validate config hasn't changed
         if (existingConfigHash !== currentConfigHash) {
           if (resumeMode === 'resume') {
-            throw new Error(
-              'Configuration has changed since last run. Use --resume-mode=fresh to start over.'
-            );
+            // There is no --resume-mode flag: the old message pointed at one (#9 review).
+            throw new ConfigChangedError(dbPath);
           } else {
             if (!quiet) {
               console.log('⚠️  Configuration changed. Starting fresh.');
@@ -897,9 +896,12 @@ export async function analyzeDataWithDb(
       const originalMessage = error instanceof Error ? error.message : String(error);
       const progress = db.state.getProcessingProgress();
       console.error(`⚠️  Processing stopped: ${originalMessage}`);
-      console.error(
-        `   Progress saved to ${dbPath} (${progress.processed_rows}/${progress.total_rows} rows). Re-run the same command to resume.`
-      );
+      // Re-running cannot help when the database belongs to a different configuration.
+      if (!(error instanceof ConfigChangedError)) {
+        console.error(
+          `   Progress saved to ${dbPath} (${progress.processed_rows}/${progress.total_rows} rows). Re-run the same command to resume.`
+        );
+      }
     }
 
     throw error;
