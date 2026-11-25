@@ -29,7 +29,7 @@ You can customize the LLM settings in your `config.json`:
   stable and reproducible, while still remaining configurable when needed
 - **uuidColumn**: Column name for UUID generation; if it is missing or empty, the CLI falls back to email fields, and if
   no valid key is available it generates a deterministic v5 UUID from a hash of the row
-- **batchSize**: Number of records per API request (1-50, default 5)
+- **batchSize**: Number of records per API request (default 5)
 - **concurrencySize**: Concurrent API requests (1-20, default 5)
 
 The tool supports multiple LLM providers through a pluggable client architecture. Currently supports OpenAI, with easy extensibility for other providers.

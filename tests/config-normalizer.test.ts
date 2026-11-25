@@ -258,4 +258,13 @@ describe('Config Normalizer - batchSize / concurrencySize (#9)', () => {
     const config = { ...baseConfig, [key]: value } as unknown as AppConfig;
     expect(() => validateConfig(config)).toThrow(new RegExp(`${key} must be a positive integer`));
   });
+
+  it('reports NaN as NaN and a string with its quotes', () => {
+    const withNaN = { ...baseConfig, batchSize: Number.NaN };
+    expect(() => validateConfig(withNaN)).toThrow('batchSize must be a positive integer, got NaN');
+    const withString = { ...baseConfig, concurrencySize: '5' } as unknown as AppConfig;
+    expect(() => validateConfig(withString)).toThrow(
+      'concurrencySize must be a positive integer, got "5"'
+    );
+  });
 });

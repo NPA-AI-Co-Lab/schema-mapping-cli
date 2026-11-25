@@ -7,11 +7,9 @@ import fs, { existsSync } from 'fs';
 import crypto from 'crypto';
 import { AppConfig } from './types.js';
 import { deriveDatabasePath } from '../database/index.js';
+import { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE } from './config-defaults.js';
 
-/** Records per LLM request when the config does not set `batchSize`. */
-export const DEFAULT_BATCH_SIZE = 5;
-/** Concurrent LLM requests when the config does not set `concurrencySize`. */
-export const DEFAULT_CONCURRENCY_SIZE = 5;
+export { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE };
 
 /**
  * Normalize configuration to use dataPaths array
@@ -72,6 +70,11 @@ export function normalizeConfig(config: AppConfig): AppConfig {
   return normalized;
 }
 
+/** A config value as the user would recognise it: `"5"` for a string, `NaN` for NaN (not `null`). */
+function describeValue(value: unknown): string {
+  return typeof value === 'number' ? String(value) : JSON.stringify(value);
+}
+
 /**
  * Validate configuration
  */
@@ -113,7 +116,7 @@ export function validateConfig(config: AppConfig): void {
 
   // Validate batch size. `<= 0` alone let undefined, NaN and strings through (#9).
   if (!Number.isInteger(config.batchSize) || config.batchSize <= 0) {
-    errors.push(`batchSize must be a positive integer, got ${JSON.stringify(config.batchSize)}`);
+    errors.push(`batchSize must be a positive integer, got ${describeValue(config.batchSize)}`);
   } else if (config.batchSize > 100) {
     errors.push('batchSize should not exceed 100 for optimal performance');
   }
@@ -121,7 +124,7 @@ export function validateConfig(config: AppConfig): void {
   // Validate concurrency size
   if (!Number.isInteger(config.concurrencySize) || config.concurrencySize <= 0) {
     errors.push(
-      `concurrencySize must be a positive integer, got ${JSON.stringify(config.concurrencySize)}`
+      `concurrencySize must be a positive integer, got ${describeValue(config.concurrencySize)}`
     );
   } else if (config.concurrencySize > 20) {
     errors.push('concurrencySize should not exceed 20 to avoid rate limits');

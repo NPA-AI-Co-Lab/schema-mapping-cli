@@ -9,6 +9,7 @@ import { showOptionsSummary } from './config-summary.js';
 import { normalizeConfig } from './config-normalizer.js';
 import { AppConfig } from './types.js';
 import { configureTaxonomies } from '../jsonld/taxonomy.js';
+import { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE } from './config-defaults.js';
 
 /**
  * Command-line values that take precedence over the config file. They are applied before
@@ -90,8 +91,8 @@ export async function getAppParamsFromConfig(
     hidePII: fullConfig.hidePII ?? true,
     retriesNumber: fullConfig.retriesNumber ?? 2,
     requiredFieldErrorsFailBatch: fullConfig.requiredFieldErrorsFailBatch ?? true,
-    batchSize: fullConfig.batchSize ?? 5,
-    concurrencySize: fullConfig.concurrencySize ?? 5,
+    batchSize: fullConfig.batchSize ?? DEFAULT_BATCH_SIZE,
+    concurrencySize: fullConfig.concurrencySize ?? DEFAULT_CONCURRENCY_SIZE,
     defaultModel: fullConfig.defaultModel ?? 'gpt-6-luna',
     fallbackModel: fullConfig.fallbackModel ?? 'gpt-6-sol',
     uuidColumn: fullConfig.uuidColumn,
@@ -163,8 +164,8 @@ export async function getAppParams(overrides: ConfigOverrides = {}): Promise<App
     hidePII: fullConfig.hidePII ?? true,
     retriesNumber: fullConfig.retriesNumber ?? 2,
     requiredFieldErrorsFailBatch: fullConfig.requiredFieldErrorsFailBatch ?? true,
-    batchSize: fullConfig.batchSize ?? 5,
-    concurrencySize: fullConfig.concurrencySize ?? 5,
+    batchSize: fullConfig.batchSize ?? DEFAULT_BATCH_SIZE,
+    concurrencySize: fullConfig.concurrencySize ?? DEFAULT_CONCURRENCY_SIZE,
     defaultModel: fullConfig.defaultModel ?? 'gpt-6-luna',
     fallbackModel: fullConfig.fallbackModel ?? 'gpt-6-sol',
     uuidColumn: fullConfig.uuidColumn,
