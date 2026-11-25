@@ -193,3 +193,69 @@ describe('Config Normalizer - Rate Limit Handling', () => {
     });
   });
 });
+
+describe('Config Normalizer - batchSize / concurrencySize (#9)', () => {
+  const baseConfig: AppConfig = {
+    dataPaths: ['test.csv'],
+    schemaPath: 'schema.jsonld',
+    outputPath: 'output.jsonld',
+    enableLogging: false,
+    hidePII: false,
+    retriesNumber: 2,
+    requiredFieldErrorsFailBatch: false,
+    batchSize: 5,
+    concurrencySize: 5,
+    defaultModel: 'gpt-4',
+    fallbackModel: 'gpt-3.5-turbo',
+  };
+
+  function without(...keys: (keyof AppConfig)[]): AppConfig {
+    const config: Partial<AppConfig> = { ...baseConfig };
+    for (const key of keys) delete config[key];
+    return config as AppConfig;
+  }
+
+  it('defaults both to 5 when they are missing', () => {
+    const normalized = normalizeConfig(without('batchSize', 'concurrencySize'));
+    expect(normalized.batchSize).toBe(5);
+    expect(normalized.concurrencySize).toBe(5);
+    expect(() => validateConfig(normalized)).not.toThrow();
+  });
+
+  it('defaults each one on its own', () => {
+    expect(normalizeConfig(without('batchSize')).batchSize).toBe(5);
+    expect(normalizeConfig(without('concurrencySize')).concurrencySize).toBe(5);
+  });
+
+  it('treats null like a missing value', () => {
+    const config = {
+      ...baseConfig,
+      batchSize: null,
+      concurrencySize: null,
+    } as unknown as AppConfig;
+    const normalized = normalizeConfig(config);
+    expect(normalized.batchSize).toBe(5);
+    expect(normalized.concurrencySize).toBe(5);
+  });
+
+  it('keeps values that are set', () => {
+    const normalized = normalizeConfig({ ...baseConfig, batchSize: 10, concurrencySize: 2 });
+    expect(normalized.batchSize).toBe(10);
+    expect(normalized.concurrencySize).toBe(2);
+  });
+
+  it.each([
+    ['batchSize', 0],
+    ['batchSize', -1],
+    ['batchSize', 2.5],
+    ['batchSize', '5'],
+    ['batchSize', Number.NaN],
+    ['concurrencySize', 0],
+    ['concurrencySize', 1.5],
+    ['concurrencySize', '5'],
+    ['concurrencySize', Number.NaN],
+  ])('rejects %s = %s, naming the setting', (key, value) => {
+    const config = { ...baseConfig, [key]: value } as unknown as AppConfig;
+    expect(() => validateConfig(config)).toThrow(new RegExp(`${key} must be a positive integer`));
+  });
+});

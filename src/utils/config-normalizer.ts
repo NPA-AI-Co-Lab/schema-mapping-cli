@@ -8,6 +8,11 @@ import crypto from 'crypto';
 import { AppConfig } from './types.js';
 import { deriveDatabasePath } from '../database/index.js';
 
+/** Records per LLM request when the config does not set `batchSize`. */
+export const DEFAULT_BATCH_SIZE = 5;
+/** Concurrent LLM requests when the config does not set `concurrencySize`. */
+export const DEFAULT_CONCURRENCY_SIZE = 5;
+
 /**
  * Normalize configuration to use dataPaths array
  * Converts legacy single dataPath to dataPaths array
@@ -36,6 +41,15 @@ export function normalizeConfig(config: AppConfig): AppConfig {
   // Set default resume mode
   if (!normalized.resumeMode) {
     normalized.resumeMode = 'auto';
+  }
+
+  // Set batching defaults. Without them a missing batchSize made the run "complete" with 0 rows
+  // processed, and a missing concurrencySize failed inside p-limit (#9).
+  if (normalized.batchSize === undefined || normalized.batchSize === null) {
+    normalized.batchSize = DEFAULT_BATCH_SIZE;
+  }
+  if (normalized.concurrencySize === undefined || normalized.concurrencySize === null) {
+    normalized.concurrencySize = DEFAULT_CONCURRENCY_SIZE;
   }
 
   // Set rate-limit defaults
@@ -97,16 +111,18 @@ export function validateConfig(config: AppConfig): void {
     }
   }
 
-  // Validate batch size
-  if (config.batchSize <= 0) {
-    errors.push('batchSize must be greater than 0');
+  // Validate batch size. `<= 0` alone let undefined, NaN and strings through (#9).
+  if (!Number.isInteger(config.batchSize) || config.batchSize <= 0) {
+    errors.push(`batchSize must be a positive integer, got ${JSON.stringify(config.batchSize)}`);
   } else if (config.batchSize > 100) {
     errors.push('batchSize should not exceed 100 for optimal performance');
   }
 
   // Validate concurrency size
-  if (config.concurrencySize <= 0) {
-    errors.push('concurrencySize must be greater than 0');
+  if (!Number.isInteger(config.concurrencySize) || config.concurrencySize <= 0) {
+    errors.push(
+      `concurrencySize must be a positive integer, got ${JSON.stringify(config.concurrencySize)}`
+    );
   } else if (config.concurrencySize > 20) {
     errors.push('concurrencySize should not exceed 20 to avoid rate limits');
   }
