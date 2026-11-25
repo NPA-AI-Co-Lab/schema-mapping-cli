@@ -9,7 +9,12 @@ import { showOptionsSummary } from './config-summary.js';
 import { normalizeConfig } from './config-normalizer.js';
 import { AppConfig } from './types.js';
 import { configureTaxonomies } from '../jsonld/taxonomy.js';
-import { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE } from './config-defaults.js';
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_CONCURRENCY_SIZE,
+  DEFAULT_HIDE_PII,
+  DEFAULT_RETRIES_NUMBER,
+} from './config-defaults.js';
 
 /**
  * Command-line values that take precedence over the config file. They are applied before
@@ -88,8 +93,8 @@ export async function getAppParamsFromConfig(
     outputPath,
     databasePath: fullConfig.databasePath,
     enableLogging: fullConfig.enableLogging ?? false,
-    hidePII: fullConfig.hidePII ?? true,
-    retriesNumber: fullConfig.retriesNumber ?? 2,
+    hidePII: fullConfig.hidePII ?? DEFAULT_HIDE_PII,
+    retriesNumber: fullConfig.retriesNumber ?? DEFAULT_RETRIES_NUMBER,
     requiredFieldErrorsFailBatch: fullConfig.requiredFieldErrorsFailBatch ?? true,
     batchSize: fullConfig.batchSize ?? DEFAULT_BATCH_SIZE,
     concurrencySize: fullConfig.concurrencySize ?? DEFAULT_CONCURRENCY_SIZE,
@@ -161,8 +166,8 @@ export async function getAppParams(overrides: ConfigOverrides = {}): Promise<App
     outputPath,
     databasePath: fullConfig.databasePath,
     enableLogging: fullConfig.enableLogging ?? false,
-    hidePII: fullConfig.hidePII ?? true,
-    retriesNumber: fullConfig.retriesNumber ?? 2,
+    hidePII: fullConfig.hidePII ?? DEFAULT_HIDE_PII,
+    retriesNumber: fullConfig.retriesNumber ?? DEFAULT_RETRIES_NUMBER,
     requiredFieldErrorsFailBatch: fullConfig.requiredFieldErrorsFailBatch ?? true,
     batchSize: fullConfig.batchSize ?? DEFAULT_BATCH_SIZE,
     concurrencySize: fullConfig.concurrencySize ?? DEFAULT_CONCURRENCY_SIZE,

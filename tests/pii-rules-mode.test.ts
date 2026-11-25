@@ -9,6 +9,7 @@ import {
   scoreResponse,
   type FixturePaths,
 } from './helpers/db-pipeline-fixture.js';
+import type { AppConfig } from '../src/utils/types.js';
 
 /**
  * Regression test for issue #7: with a rules file, `hidePII: true` must still mask what goes
@@ -167,6 +168,23 @@ describe('issue #7: hidePII masks the LLM input in rules mode', () => {
       expect(output, `"${value}" is missing from the output`).toContain(value);
     }
     expect(output).not.toMatch(/NAME_\d|EMAIL_\d+@GMAIL\.COM|ADDRESS_\d|ID_\d/);
+  });
+
+  it('masks by default when the config does not set hidePII (#13)', async () => {
+    const client = new FakeLLMClient((request) => {
+      const rows = JSON.parse(request.input.find((m) => m.role === 'user')!.content);
+      return scoreResponse(rows.length, 4);
+    });
+    const config: Partial<AppConfig> = { ...configFor(true) };
+    delete config.hidePII;
+
+    await analyzeDataWithDb(config as AppConfig, client, false);
+
+    const sent = userMessages(client);
+    expect(client.calls.length).toBeGreaterThan(0);
+    for (const value of PERSONAL_VALUES) {
+      expect(sent, `"${value}" was sent to the LLM unmasked`).not.toContain(value);
+    }
   });
 
   it('sends the values as they are when hidePII is false', async () => {

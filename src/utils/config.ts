@@ -3,7 +3,12 @@ import { EnvConfig, AppConfig } from './types.js';
 import { loadJSON } from './file-system.js';
 import path from 'path';
 import fs from 'fs';
-import { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE } from './config-defaults.js';
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_CONCURRENCY_SIZE,
+  DEFAULT_HIDE_PII,
+  DEFAULT_RETRIES_NUMBER,
+} from './config-defaults.js';
 
 dotenv.config({ quiet: true });
 
@@ -34,8 +39,8 @@ export function getDefaultAppConfig(): AppConfig {
     schemaPath: '',
     outputPath: '',
     enableLogging: false,
-    hidePII: true,
-    retriesNumber: 2,
+    hidePII: DEFAULT_HIDE_PII,
+    retriesNumber: DEFAULT_RETRIES_NUMBER,
     requiredFieldErrorsFailBatch: false,
     batchSize: DEFAULT_BATCH_SIZE,
     concurrencySize: DEFAULT_CONCURRENCY_SIZE,
