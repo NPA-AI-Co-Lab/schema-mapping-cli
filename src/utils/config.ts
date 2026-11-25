@@ -3,6 +3,7 @@ import { EnvConfig, AppConfig } from './types.js';
 import { loadJSON } from './file-system.js';
 import path from 'path';
 import fs from 'fs';
+import { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE } from './config-defaults.js';
 
 dotenv.config({ quiet: true });
 
@@ -36,8 +37,8 @@ export function getDefaultAppConfig(): AppConfig {
     hidePII: true,
     retriesNumber: 2,
     requiredFieldErrorsFailBatch: false,
-    batchSize: 5,
-    concurrencySize: 5,
+    batchSize: DEFAULT_BATCH_SIZE,
+    concurrencySize: DEFAULT_CONCURRENCY_SIZE,
     defaultModel: 'gpt-6-luna',
     fallbackModel: 'gpt-6-sol',
     temperature: 0,
@@ -73,8 +74,8 @@ export function loadGlobalConfig(configPath?: string) {
     config = {};
   }
   return {
-    BATCH_SIZE: config.batchSize ?? 5,
-    CONC_SIZE: config.concurrencySize ?? 5,
+    BATCH_SIZE: config.batchSize ?? DEFAULT_BATCH_SIZE,
+    CONC_SIZE: config.concurrencySize ?? DEFAULT_CONCURRENCY_SIZE,
     DEFAULT_MODEL: config.defaultModel ?? 'gpt-6-luna',
     FALLBACK_MODEL: config.fallbackModel ?? 'gpt-6-sol',
   };
@@ -84,14 +85,14 @@ export function loadGlobalConfig(configPath?: string) {
  * Get batch size from configuration
  */
 export function getBatchSize(config?: AppConfig): number {
-  return config?.batchSize ?? 5;
+  return config?.batchSize ?? DEFAULT_BATCH_SIZE;
 }
 
 /**
  * Get concurrency size from configuration
  */
 export function getConcurrencySize(config?: AppConfig): number {
-  return config?.concurrencySize ?? 5;
+  return config?.concurrencySize ?? DEFAULT_CONCURRENCY_SIZE;
 }
 
 /**

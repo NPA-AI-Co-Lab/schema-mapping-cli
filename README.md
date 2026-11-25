@@ -29,8 +29,8 @@ You can customize the LLM settings in your `config.json`:
   stable and reproducible, while still remaining configurable when needed
 - **uuidColumn**: Column name for UUID generation; if it is missing or empty, the CLI falls back to email fields, and if
   no valid key is available it generates a deterministic v5 UUID from a hash of the row
-- **batchSize**: Number of records per API request (1-50)
-- **concurrencySize**: Concurrent API requests (1-20)
+- **batchSize**: Number of records per API request (default 5)
+- **concurrencySize**: Concurrent API requests (1-20, default 5)
 
 The tool supports multiple LLM providers through a pluggable client architecture. Currently supports OpenAI, with easy extensibility for other providers.
 
@@ -124,8 +124,8 @@ Create a configuration file (`config.json`) with your data and schema paths:
 - **hidePII** enables/disables PII handling logic.
 - **retriesNumber** specifies how many retries the program will make on validation and model errors (default 2, range 0-10); rate-limit errors use `rateLimitMaxRetries` instead.
 - **requiredFieldErrorsFailBatch** is an optional flag specifying how the tool should handle missing required fields - similarly to other validation errors if true, or by simply logging them if false.
-- **batchSize** - Number of data rows sent per request to the LLM API;
-- **concurrencySize** - Maximum number of asynchronous prompts that can run at once;
+- **batchSize** - Number of data rows sent per request to the LLM API (default 5);
+- **concurrencySize** - Maximum number of asynchronous prompts that can run at once (default 5);
 - **defaultModel** - The model that will analyze the data by default (it is possible to change LLM versions as you like);
 - **fallbackModel** - The model that will handle analysis when the default model fails;
 - **temperature** - Optional LLM sampling temperature in range `0..2`; it now defaults to `0` to keep extraction
