@@ -120,8 +120,8 @@ Create a configuration file (`config.json`) with your data and schema paths:
 - **outputPath** specifies the path where results will be saved. Required when using `--config` argument, optional for interactive mode;
 - **databasePath** (optional) specifies where the SQLite database should be created. Auto-derived from outputPath if omitted;
 - **resumeMode** (optional) controls resume behavior: `"auto"` (default), `"fresh"`, or `"resume"`;
-- **enableLogging** enables/disables logging of AI prompts and error messages into separate files;
-- **hidePII** enables/disables PII handling logic.
+- **enableLogging** enables/disables logging of AI prompts and error messages into separate files (default `false`);
+- **hidePII** enables/disables PII handling logic (default `true`: personal data is masked before it is sent to the LLM unless this is set to `false`).
 - **retriesNumber** specifies how many retries the program will make on validation and model errors (default 2, range 0-10); rate-limit errors use `rateLimitMaxRetries` instead.
 - **requiredFieldErrorsFailBatch** is an optional flag specifying how the tool should handle missing required fields - similarly to other validation errors if true, or by simply logging them if false.
 - **batchSize** - Number of data rows sent per request to the LLM API (default 5);

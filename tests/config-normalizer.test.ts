@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { normalizeConfig, validateConfig } from '../src/utils/config-normalizer.js';
+import {
+  normalizeConfig,
+  validateConfig,
+  createConfigHash,
+} from '../src/utils/config-normalizer.js';
 import { AppConfig } from '../src/utils/types.js';
 
 // Mock the database module
@@ -266,5 +270,70 @@ describe('Config Normalizer - batchSize / concurrencySize (#9)', () => {
     expect(() => validateConfig(withString)).toThrow(
       'concurrencySize must be a positive integer, got "5"'
     );
+  });
+});
+
+describe('Config Normalizer - hidePII / retriesNumber / logging defaults (#13)', () => {
+  const baseConfig: AppConfig = {
+    dataPaths: ['test.csv'],
+    schemaPath: 'schema.jsonld',
+    outputPath: 'output.jsonld',
+    enableLogging: false,
+    hidePII: false,
+    retriesNumber: 2,
+    requiredFieldErrorsFailBatch: false,
+    batchSize: 5,
+    concurrencySize: 5,
+    defaultModel: 'gpt-4',
+    fallbackModel: 'gpt-3.5-turbo',
+  };
+
+  function without(...keys: (keyof AppConfig)[]): AppConfig {
+    const config: Partial<AppConfig> = { ...baseConfig };
+    for (const key of keys) delete config[key];
+    return config as AppConfig;
+  }
+
+  it('turns PII masking on when hidePII is missing or null', () => {
+    expect(normalizeConfig(without('hidePII')).hidePII).toBe(true);
+    const withNull = { ...baseConfig, hidePII: null } as unknown as AppConfig;
+    expect(normalizeConfig(withNull).hidePII).toBe(true);
+  });
+
+  it('keeps an explicit hidePII: false', () => {
+    expect(normalizeConfig({ ...baseConfig, hidePII: false }).hidePII).toBe(false);
+  });
+
+  it('defaults retriesNumber to 2 and keeps an explicit 0', () => {
+    expect(normalizeConfig(without('retriesNumber')).retriesNumber).toBe(2);
+    expect(normalizeConfig({ ...baseConfig, retriesNumber: 0 }).retriesNumber).toBe(0);
+  });
+
+  it('defaults enableLogging and forceReingestion to false', () => {
+    const normalized = normalizeConfig(without('enableLogging'));
+    expect(normalized.enableLogging).toBe(false);
+    expect(normalized.forceReingestion).toBe(false);
+  });
+
+  it('leaves a missing requiredFieldErrorsFailBatch unset, so the config hash does not change', () => {
+    const normalized = normalizeConfig(without('requiredFieldErrorsFailBatch'));
+    expect(normalized.requiredFieldErrorsFailBatch).toBeUndefined();
+  });
+
+  it('hashes a config without hidePII like one with hidePII: true', () => {
+    const missing = normalizeConfig(without('hidePII'));
+    const explicit = normalizeConfig({ ...baseConfig, hidePII: true });
+    expect(createConfigHash(missing)).toBe(createConfigHash(explicit));
+  });
+
+  it('a config file with neither hidePII nor retriesNumber validates', () => {
+    expect(() =>
+      validateConfig(normalizeConfig(without('hidePII', 'retriesNumber')))
+    ).not.toThrow();
+  });
+
+  it.each([-1, 1.5, '2', Number.NaN])('rejects retriesNumber = %s', (value) => {
+    const config = { ...baseConfig, retriesNumber: value } as unknown as AppConfig;
+    expect(() => validateConfig(config)).toThrow(/retriesNumber must be a non-negative integer/);
   });
 });

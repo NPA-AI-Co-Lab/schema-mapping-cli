@@ -11,6 +11,7 @@ import {
   restoreCliSigintHandler,
 } from '../utils/index.js';
 import { deriveDatabasePath } from '../database/index.js';
+import { DEFAULT_HIDE_PII, DEFAULT_RETRIES_NUMBER } from '../utils/config-defaults.js';
 import { CliOptions, PackageInfo } from './cli-types.js';
 import { shouldUseInteractiveMode, validateOptions } from './cli-config.js';
 
@@ -223,9 +224,13 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
 
   if (!quiet) {
     console.error(`- Output: ${outputToFile ? appParams.outputPath : 'stdout'}`);
+    // Show the values the run will use: normalizeConfig (in the pipeline) fills in the ones a
+    // config file leaves out, so print those defaults rather than "disabled" / "undefined".
     console.error(`- Logging: ${appParams.enableLogging ? 'enabled' : 'disabled'}`);
-    console.error(`- PII protection: ${appParams.hidePII ? 'enabled' : 'disabled'}`);
-    console.error(`- Retries set: ${appParams.retriesNumber}\n`);
+    console.error(
+      `- PII protection: ${(appParams.hidePII ?? DEFAULT_HIDE_PII) ? 'enabled' : 'disabled'}`
+    );
+    console.error(`- Retries set: ${appParams.retriesNumber ?? DEFAULT_RETRIES_NUMBER}\n`);
   }
 
   removeCliSigintHandler();

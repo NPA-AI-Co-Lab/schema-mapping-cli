@@ -7,7 +7,12 @@ import fs, { existsSync } from 'fs';
 import crypto from 'crypto';
 import { AppConfig } from './types.js';
 import { deriveDatabasePath } from '../database/index.js';
-import { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE } from './config-defaults.js';
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_CONCURRENCY_SIZE,
+  DEFAULT_HIDE_PII,
+  DEFAULT_RETRIES_NUMBER,
+} from './config-defaults.js';
 
 export { DEFAULT_BATCH_SIZE, DEFAULT_CONCURRENCY_SIZE };
 
@@ -49,6 +54,25 @@ export function normalizeConfig(config: AppConfig): AppConfig {
   if (normalized.concurrencySize === undefined || normalized.concurrencySize === null) {
     normalized.concurrencySize = DEFAULT_CONCURRENCY_SIZE;
   }
+
+  // A config file used as is (CLI `-c`, or ./config.json) can leave these out. Without a default,
+  // a missing hidePII turned PII masking off and a missing retriesNumber left validation retries
+  // unbounded (#13). The interactive path and getDefaultAppConfig already used these values.
+  if (normalized.hidePII === undefined || normalized.hidePII === null) {
+    normalized.hidePII = DEFAULT_HIDE_PII;
+  }
+  if (normalized.retriesNumber === undefined || normalized.retriesNumber === null) {
+    normalized.retriesNumber = DEFAULT_RETRIES_NUMBER;
+  }
+  if (normalized.enableLogging === undefined || normalized.enableLogging === null) {
+    normalized.enableLogging = false;
+  }
+  if (normalized.forceReingestion === undefined || normalized.forceReingestion === null) {
+    normalized.forceReingestion = false;
+  }
+  // requiredFieldErrorsFailBatch is deliberately not defaulted here: a missing value already
+  // behaves as false, and it is part of the config hash, so writing `false` in would make every
+  // database from a config without it look like a changed configuration.
 
   // Set rate-limit defaults
   if (normalized.rateLimitMaxRetries === undefined) {
@@ -131,8 +155,10 @@ export function validateConfig(config: AppConfig): void {
   }
 
   // Validate retries
-  if (config.retriesNumber < 0) {
-    errors.push('retriesNumber must be non-negative');
+  if (!Number.isInteger(config.retriesNumber) || config.retriesNumber < 0) {
+    errors.push(
+      `retriesNumber must be a non-negative integer, got ${describeValue(config.retriesNumber)}`
+    );
   }
 
   // Validate rules path if specified
