@@ -359,6 +359,15 @@ describe('Config Normalizer - retry counts must be whole numbers', () => {
     );
   });
 
+  it('rejects a fractional or NaN rateLimitMaxWaitMs', () => {
+    expect(() => validateConfig({ ...baseConfig, rateLimitMaxWaitMs: 2000.5 })).toThrow(
+      'rateLimitMaxWaitMs must be between 1000 and 600000, got 2000.5'
+    );
+    expect(() => validateConfig({ ...baseConfig, rateLimitMaxWaitMs: Number.NaN })).toThrow(
+      'rateLimitMaxWaitMs must be between 1000 and 600000, got NaN'
+    );
+  });
+
   it('rejects a fractional sdkMaxRetries', () => {
     expect(() => validateConfig({ ...baseConfig, sdkMaxRetries: 1.5 })).toThrow(
       'sdkMaxRetries must be between 0 and 5, got 1.5'

@@ -13,7 +13,7 @@ import {
 import { deriveDatabasePath } from '../database/index.js';
 import { DEFAULT_HIDE_PII, DEFAULT_RETRIES_NUMBER } from '../utils/config-defaults.js';
 import { CliOptions, PackageInfo } from './cli-types.js';
-import { parseIntegerOption, shouldUseInteractiveMode, validateOptions } from './cli-config.js';
+import { numericFlagOverrides, shouldUseInteractiveMode, validateOptions } from './cli-config.js';
 
 function parseFieldList(value?: string): string[] | undefined {
   if (!value) {
@@ -51,6 +51,10 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
   // Automatically enable quiet mode when using stdout to avoid interfering with JSON output
   const quiet = options.quiet || options.stdout || false;
 
+  // Reject bad numeric flags (--batch-size 2.7, ...) before any prompt; only those are checked
+  // here, the interactive prompts collect the rest.
+  validateOptions(options);
+
   if (!quiet) {
     console.error(`\n${bold(`Welcome to ${pkg.name} ${pkg.version}!`)}\n`);
   }
@@ -74,11 +78,6 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
 
   const appParams: AppConfig = {
     ...baseParams,
-    batchSize: options.batchSize ? parseIntegerOption(options.batchSize) : baseParams.batchSize,
-    concurrencySize: options.concurrency
-      ? parseIntegerOption(options.concurrency)
-      : baseParams.concurrencySize,
-    retriesNumber: options.retries ? parseIntegerOption(options.retries) : baseParams.retriesNumber,
     defaultModel: options.model || baseParams.defaultModel,
     fallbackModel: options.fallbackModel || baseParams.fallbackModel,
     enableLogging: options.logging ?? baseParams.enableLogging,
@@ -89,20 +88,13 @@ async function runInteractiveMode(options: CliOptions, pkg: PackageInfo) {
     rulesPath: options.rules || baseParams.rulesPath,
     taxonomiesPath: options.taxonomies || baseParams.taxonomiesPath,
     llmFieldOverrides,
-    rateLimitMaxRetries: options.rateLimitRetries
-      ? parseIntegerOption(options.rateLimitRetries)
-      : baseParams.rateLimitMaxRetries,
-    rateLimitMaxWaitMs: options.rateLimitMaxWait
-      ? parseIntegerOption(options.rateLimitMaxWait)
-      : baseParams.rateLimitMaxWaitMs,
-    sdkMaxRetries: options.sdkRetries
-      ? parseIntegerOption(options.sdkRetries)
-      : baseParams.sdkMaxRetries,
     adaptiveConcurrency:
       options.noAdaptiveConcurrency !== undefined
         ? !options.noAdaptiveConcurrency
         : baseParams.adaptiveConcurrency,
     failFast: options.failFast ?? baseParams.failFast,
+    // --batch-size, --concurrency, --retries, --rate-limit-*, --sdk-retries (validated above)
+    ...numericFlagOverrides(options),
   };
 
   if (options.stdout) {
@@ -181,13 +173,8 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     databasePath: baseConfig.databasePath,
     enableLogging: options.logging ?? baseConfig.enableLogging,
     hidePII: options.hidePii ?? baseConfig.hidePII,
-    retriesNumber: options.retries ? parseIntegerOption(options.retries) : baseConfig.retriesNumber,
     requiredFieldErrorsFailBatch:
       options.requiredFieldsFailBatch ?? baseConfig.requiredFieldErrorsFailBatch,
-    batchSize: options.batchSize ? parseIntegerOption(options.batchSize) : baseConfig.batchSize,
-    concurrencySize: options.concurrency
-      ? parseIntegerOption(options.concurrency)
-      : baseConfig.concurrencySize,
     defaultModel: options.model || getDefaultModel(baseConfig),
     fallbackModel: options.fallbackModel || getFallbackModel(baseConfig),
     uuidColumn: baseConfig.uuidColumn,
@@ -195,20 +182,13 @@ async function runCliMode(options: CliOptions, pkg: PackageInfo) {
     taxonomiesPath: options.taxonomies || baseConfig.taxonomiesPath,
     llmFieldOverrides,
     resumeMode: baseConfig.resumeMode,
-    rateLimitMaxRetries: options.rateLimitRetries
-      ? parseIntegerOption(options.rateLimitRetries)
-      : baseConfig.rateLimitMaxRetries,
-    rateLimitMaxWaitMs: options.rateLimitMaxWait
-      ? parseIntegerOption(options.rateLimitMaxWait)
-      : baseConfig.rateLimitMaxWaitMs,
-    sdkMaxRetries: options.sdkRetries
-      ? parseIntegerOption(options.sdkRetries)
-      : baseConfig.sdkMaxRetries,
     adaptiveConcurrency:
       options.noAdaptiveConcurrency !== undefined
         ? !options.noAdaptiveConcurrency
         : baseConfig.adaptiveConcurrency,
     failFast: options.failFast ?? baseConfig.failFast,
+    // --batch-size, --concurrency, --retries, --rate-limit-*, --sdk-retries (validated above)
+    ...numericFlagOverrides(options),
   };
 
   // If stdout mode requested, ensure outputPath signals stdout and set a database path

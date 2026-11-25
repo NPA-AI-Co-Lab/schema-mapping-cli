@@ -193,7 +193,9 @@ export function validateConfig(config: AppConfig): void {
   // Validate rateLimitMaxWaitMs
   if (
     config.rateLimitMaxWaitMs !== undefined &&
-    (config.rateLimitMaxWaitMs < 1000 || config.rateLimitMaxWaitMs > 600000)
+    (!Number.isInteger(config.rateLimitMaxWaitMs) ||
+      config.rateLimitMaxWaitMs < 1000 ||
+      config.rateLimitMaxWaitMs > 600000)
   ) {
     errors.push(
       `rateLimitMaxWaitMs must be between 1000 and 600000, got ${config.rateLimitMaxWaitMs}`
