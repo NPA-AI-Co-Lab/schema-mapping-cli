@@ -99,4 +99,10 @@ export interface DeterministicFieldResult {
   resolvedFields: Set<string>;
   pendingFields: Set<string>;
   missingRequired: Set<string>;
+  /**
+   * Source columns whose value a rule actually used for this row. A column a rule names but did
+   * not use (its `when` failed, the value was empty, or an earlier column of a `source` list won)
+   * is not here, so the LLM still gets it under `unmappedSource` (#8).
+   */
+  consumedColumns: Set<string>;
 }

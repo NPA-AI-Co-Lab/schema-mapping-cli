@@ -116,9 +116,15 @@ function hasValueForField(resolvedFields: Set<string>, fieldPath: string): boole
   return false;
 }
 
-function resolveSourceValue(row: Record<string, string>, source?: string | string[]): unknown {
+interface SourceValue {
+  value: unknown;
+  /** The column the value was read from; undefined when the rule has no `source`. */
+  column?: string;
+}
+
+function resolveSourceValue(row: Record<string, string>, source?: string | string[]): SourceValue {
   if (!source) {
-    return undefined;
+    return { value: undefined };
   }
 
   if (Array.isArray(source)) {
@@ -130,28 +136,35 @@ function resolveSourceValue(row: Record<string, string>, source?: string | strin
       if (String(candidate).trim().length === 0) {
         continue;
       }
-      return candidate;
+      return { value: candidate, column };
     }
 
     const lastColumn = source[source.length - 1];
-    return row[lastColumn];
+    return { value: row[lastColumn], column: lastColumn };
   }
 
-  return row[source];
+  return { value: row[source], column: source };
+}
+
+interface RuleResult {
+  value: unknown;
+  /** The source column the value came from; undefined for a literal or a fallback. */
+  column?: string;
 }
 
 function evaluateRule(
   row: Record<string, string>,
   fieldPath: string,
   rule: NormalizedFieldRule
-): unknown {
+): RuleResult {
   if (!evaluateConditions(row, rule)) {
-    return undefined;
+    return { value: undefined };
   }
 
   let value = rule.literal;
+  let column: string | undefined;
   if (value === undefined && rule.source) {
-    value = resolveSourceValue(row, rule.source);
+    ({ value, column } = resolveSourceValue(row, rule.source));
   }
 
   if (rule.transforms.length > 0) {
@@ -160,17 +173,19 @@ function evaluateRule(
 
   if ((value === undefined || isEmptyValue(value)) && rule.fallback !== undefined) {
     value = rule.fallback;
+    // The fallback replaced whatever the column held, so the column was not used.
+    column = undefined;
   }
 
   if (value === undefined || isEmptyValue(value)) {
-    return undefined;
+    return { value: undefined };
   }
 
   if (rule.taxonomy) {
     value = normalizeTaxonomyValue(value, rule.taxonomy);
   }
 
-  return value;
+  return { value, column };
 }
 
 function ensureRequiredMetadata(
@@ -196,10 +211,11 @@ export function transformRow(
   const resolvedFields = new Set<string>();
   const pendingFields = new Set<string>(rules.llmFields);
   const missingRequired = new Set<string>();
+  const consumedColumns = new Set<string>();
 
   for (const [fieldPath, rule] of rules.fieldRules.entries()) {
     const isRequiredField = rules.requiredFields.has(fieldPath);
-    const resolved = evaluateRule(row, fieldPath, rule);
+    const { value: resolved, column } = evaluateRule(row, fieldPath, rule);
 
     if (resolved === undefined) {
       if (rules.llmFields.has(fieldPath) || isRequiredField) {
@@ -212,6 +228,9 @@ export function transformRow(
 
     setValueAtPath(mapped, fieldPath, valueToStore);
     resolvedFields.add(fieldPath);
+    if (column !== undefined) {
+      consumedColumns.add(column);
+    }
     // If a value is provided deterministically, remove from pending set.
     if (!rules.llmFields.has(fieldPath)) {
       pendingFields.delete(fieldPath);
@@ -225,5 +244,61 @@ export function transformRow(
     resolvedFields,
     pendingFields,
     missingRequired,
+    consumedColumns,
   };
+}
+
+/**
+ * Key under which the LLM input carries the source columns that no rule used. Not a schema
+ * field: it exists only in what is sent to the LLM, never in the output.
+ */
+export const UNMAPPED_SOURCE_KEY = 'unmappedSource';
+
+const ruleColumnsCache = new WeakMap<LoadedRules, Set<string>>();
+
+/** Every column that some rule names as a `source`. */
+function ruleSourceColumns(rules: LoadedRules): Set<string> {
+  let columns = ruleColumnsCache.get(rules);
+  if (!columns) {
+    columns = new Set<string>();
+    for (const rule of rules.fieldRules.values()) {
+      if (!rule.source) continue;
+      for (const column of Array.isArray(rule.source) ? rule.source : [rule.source]) {
+        columns.add(column);
+      }
+    }
+    ruleColumnsCache.set(rules, columns);
+  }
+  return columns;
+}
+
+/**
+ * The record sent to the LLM in rules mode: the rule-mapped record plus, under
+ * `unmappedSource`, every source column whose value no rule used for this row (#8). Without it
+ * a column with no rule — typically the free text the LLM fields are inferred from, such as
+ * `comment` — never reached the LLM.
+ *
+ * A column is left out when a rule used its value for this row (it is already in the mapped
+ * record), or when a rule names it and it is empty (nothing to add). A column no rule names is
+ * always included, empty or not: an unanswered survey question is still a question-answer pair.
+ *
+ * Returns a new object; `prefill.mapped` is merged into the output as is and must not change.
+ */
+export function buildLlmRecord(
+  row: Record<string, unknown>,
+  prefill: DeterministicFieldResult,
+  rules: LoadedRules
+): Record<string, unknown> {
+  const ruleColumns = ruleSourceColumns(rules);
+  const unmapped: Record<string, unknown> = {};
+  for (const [column, value] of Object.entries(row)) {
+    if (prefill.consumedColumns.has(column)) continue;
+    if (ruleColumns.has(column) && isEmptyValue(value)) continue;
+    unmapped[column] = value;
+  }
+
+  if (Object.keys(unmapped).length === 0) {
+    return prefill.mapped;
+  }
+  return { ...prefill.mapped, [UNMAPPED_SOURCE_KEY]: unmapped };
 }

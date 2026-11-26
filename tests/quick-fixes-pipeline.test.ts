@@ -37,6 +37,7 @@ describe('qf-1: lazy LLM client creation (processBatch unit tests)', () => {
         resolvedFields: new Set(['person.score']),
         pendingFields: new Set<string>(),
         missingRequired: new Set<string>(),
+        consumedColumns: new Set<string>(),
       },
     ];
 
@@ -59,6 +60,7 @@ describe('qf-1: lazy LLM client creation (processBatch unit tests)', () => {
         resolvedFields: new Set<string>(),
         pendingFields: new Set<string>(['person.score']),
         missingRequired: new Set<string>(),
+        consumedColumns: new Set<string>(),
       },
     ];
 

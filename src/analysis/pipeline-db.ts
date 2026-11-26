@@ -39,7 +39,7 @@ import type { RecordData } from '../pii_handling/types.js';
 import { processBatch } from './processor.js';
 import { buildPartialSchema } from './rules/partial-schema.js';
 import type { DeterministicFieldResult, LoadedRules } from './rules/index.js';
-import { loadRulesConfig, transformRow } from './rules/index.js';
+import { buildLlmRecord, loadRulesConfig, transformRow } from './rules/index.js';
 import { DbStreamingProcessor } from './db-streaming-processor.js';
 import { FileIngestionManager } from './file-ingestion.js';
 import { DatabaseManager, deriveDatabasePath } from '../database/index.js';
@@ -614,12 +614,17 @@ export async function analyzeDataWithDb(
 
             if (rulesContext) {
               deterministicPrefills = batchData.map((row) => transformRow(row, rulesContext));
-              transformedBatch = deterministicPrefills.map((p) => p.mapped);
+              // The LLM gets the rule-mapped record plus the source columns no rule used
+              // (`unmappedSource`), e.g. the free text its fields are inferred from (#8).
+              transformedBatch = deterministicPrefills.map((prefill, i) =>
+                buildLlmRecord(batchData[i], prefill, rulesContext)
+              );
             }
 
             // Encode PII. In rules mode the records are the rule-mapped ones — nested objects,
-            // arrays and `{ value, present }` wrappers — so encodePII masks at every depth. It
-            // returns copies: the prefills keep the real values for the merge after the LLM call.
+            // arrays and `{ value, present }` wrappers — so encodePII masks at every depth,
+            // `unmappedSource` included. It returns copies: the prefills keep the real values
+            // for the merge after the LLM call.
             const { processedBatch: encodedBatch, encodingMap } = encodePII(transformedBatch);
 
             // Log LLM input for debugging

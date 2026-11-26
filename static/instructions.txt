@@ -57,6 +57,8 @@ Additional important rules:
 
   - Pay special attention to "type" fields if present - pick the values carefully, so they truly fit the input.
 
+  - A row may contain an "unmappedSource" object. It holds the columns of the original data that were not already mapped to a schema field, for example a free-text comment or survey answers. It is part of the row: read it and use it like any other data of the row. "unmappedSource" itself is not a schema field - never output it.
+
 Important nuance:
 
 Pay special attention to "survey response" type of input. If it seems like this, take special care to find all survey question-response pairs and add them to the corresponding object.
