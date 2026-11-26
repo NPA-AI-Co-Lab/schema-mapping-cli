@@ -40,6 +40,15 @@ logging/
 }
 ```
 
+With a rules file, each record is the rule-mapped one (nested by entity), and the source columns no rule used are listed under `unmappedSource`:
+
+```json
+{
+  "person": { "givenName": "NAME_1", "primaryEmail": "EMAIL_1@GMAIL.COM" },
+  "unmappedSource": { "comment": "Read the newsletter carefully and clicked on survey link" }
+}
+```
+
 ---
 
 ## 2. Validation Error Logs (`validation_errors/`)
